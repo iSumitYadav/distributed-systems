@@ -6,6 +6,8 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.io.DataOutputStream;
+import java.io.*;
 
 import edu.buffalo.cse.cse486586.simplemessenger.R;
 
@@ -151,12 +153,43 @@ public class SimpleMessengerActivity extends Activity {
         @Override
         protected Void doInBackground(ServerSocket... sockets) {
             ServerSocket serverSocket = sockets[0];
-            
-            /*
-             * TODO: Fill in your server code that receives messages and passes them
-             * to onProgressUpdate().
-             */
-            return null;
+            System.out.println(sockets);
+
+            Socket clientSocket = null;
+            while(true){
+                try {
+                    clientSocket = serverSocket.accept();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                PrintWriter out = null;
+                try {
+                    out = new PrintWriter(clientSocket.getOutputStream(), true);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                BufferedReader in = null;
+                try {
+                    in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                System.out.println(out);
+                System.out.println(in);
+                /*
+                 * TODO: Fill in your server code that receives messages and passes them
+                 * to onProgressUpdate().
+                 */
+                String[] arr = new String[2];
+    //            arr[0] = "lol";
+                try {
+                    arr[0] = in.readLine();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                publishProgress(arr);
+            }
+//            return null;
         }
 
         protected void onProgressUpdate(String...strings) {
@@ -209,14 +242,17 @@ public class SimpleMessengerActivity extends Activity {
                 if (msgs[1].equals(REMOTE_PORT0))
                     remotePort = REMOTE_PORT1;
 
-                Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}),
-                        Integer.parseInt(remotePort));
+                Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(remotePort));
                 
                 String msgToSend = msgs[0];
                 /*
                  * TODO: Fill in your client code that sends out a message.
                  */
-                socket.close();
+                DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                out.writeUTF(msgToSend);
+                out.flush();
+                out.close();
+//                socket.close();
             } catch (UnknownHostException e) {
                 Log.e(TAG, "ClientTask UnknownHostException");
             } catch (IOException e) {
