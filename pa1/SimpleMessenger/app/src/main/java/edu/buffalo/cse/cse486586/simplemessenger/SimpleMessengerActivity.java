@@ -163,13 +163,12 @@ public class SimpleMessengerActivity extends Activity {
         @Override
         protected Void doInBackground(ServerSocket... sockets) {
             ServerSocket serverSocket = sockets[0];
-//            System.out.println(sockets);
 
-//            try {
-//                serverSocket.setReuseAddress(true);
-//            } catch (SocketException e) {
-//                e.printStackTrace();
-//            }
+            /*
+             * TODO: Fill in your server code that receives messages and passes them
+             * to onProgressUpdate().
+             */
+
             Socket clientSocket = null;
             while(true){
                 try {
@@ -177,52 +176,22 @@ public class SimpleMessengerActivity extends Activity {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-//                PrintWriter out = null;
-//                try {
-//                    out = new PrintWriter(clientSocket.getOutputStream(), true);
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                }
+
                 DataInputStream in = null;
                 try {
-//                    in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                     in = new DataInputStream(clientSocket.getInputStream());
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-//                System.out.println(out);
-                System.out.println(in);
-                /*
-                 * TODO: Fill in your server code that receives messages and passes them
-                 * to onProgressUpdate().
-                 */
-                String[] arr = new String[2];
-    //            arr[0] = "lol";
+
                 try {
-//                    arr[0] = in.readLine();
-                    arr[0] = in.readUTF();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                publishProgress(arr);
-                try {
-                    clientSocket.close();
+                    publishProgress(in.readUTF());
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
-
 //            return null;
         }
-
-//        protected void onPostExecute(ServerSocket... sockets) {
-//            ServerSocket serverSocket = sockets[0];
-//            try {
-//                serverSocket.close();
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//        }
 
         protected void onProgressUpdate(String...strings) {
             /*
@@ -277,9 +246,11 @@ public class SimpleMessengerActivity extends Activity {
                 Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(remotePort));
                 
                 String msgToSend = msgs[0];
+
                 /*
                  * TODO: Fill in your client code that sends out a message.
                  */
+
                 DataOutputStream out = new DataOutputStream(socket.getOutputStream());
                 out.writeUTF(msgToSend);
                 out.flush();
