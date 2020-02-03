@@ -3,13 +3,11 @@ package edu.buffalo.cse.cse486586.simplemessenger;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.io.DataOutputStream;
-import java.io.*;
+import java.io.DataInputStream;
 
 import edu.buffalo.cse.cse486586.simplemessenger.R;
 

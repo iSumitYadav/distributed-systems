@@ -1,4 +1,0 @@
-#Fri Jan 31 11:37:33 EST 2020
-base.0=/Users/sumitkumar/UBuffalo/sem2/ds/project/pa1/SimpleMessenger/app/build/intermediates/dex/debug/mergeDexDebug/out
-path.0=classes.dex
-renamed.0=classes.dex
