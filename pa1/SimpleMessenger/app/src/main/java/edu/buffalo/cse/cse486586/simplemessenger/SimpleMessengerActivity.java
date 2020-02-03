@@ -3,8 +3,10 @@ package edu.buffalo.cse.cse486586.simplemessenger;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.io.DataOutputStream;
 import java.io.*;
@@ -76,6 +78,13 @@ public class SimpleMessengerActivity extends Activity {
              * you know how it works by reading
              * http://developer.android.com/reference/android/os/AsyncTask.html
              */
+//            ServerSocket serverSocket = new ServerSocket();
+//            try {
+//                serverSocket.setReuseAddress(true);
+//            } catch (SocketException e) {
+//                e.printStackTrace();
+//            }
+//            serverSocket.bind(new InetSocketAddress(SERVER_PORT));
             ServerSocket serverSocket = new ServerSocket(SERVER_PORT);
             new ServerTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, serverSocket);
         } catch (IOException e) {
@@ -87,6 +96,7 @@ public class SimpleMessengerActivity extends Activity {
              * and http://developer.android.com/tools/debugging/debugging-log.html
              * for more information on debugging.
              */
+            Log.e(TAG, e.toString());
             Log.e(TAG, "Can't create a ServerSocket");
             return;
         }
@@ -153,8 +163,13 @@ public class SimpleMessengerActivity extends Activity {
         @Override
         protected Void doInBackground(ServerSocket... sockets) {
             ServerSocket serverSocket = sockets[0];
-            System.out.println(sockets);
+//            System.out.println(sockets);
 
+//            try {
+//                serverSocket.setReuseAddress(true);
+//            } catch (SocketException e) {
+//                e.printStackTrace();
+//            }
             Socket clientSocket = null;
             while(true){
                 try {
@@ -162,19 +177,20 @@ public class SimpleMessengerActivity extends Activity {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                PrintWriter out = null;
+//                PrintWriter out = null;
+//                try {
+//                    out = new PrintWriter(clientSocket.getOutputStream(), true);
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+                DataInputStream in = null;
                 try {
-                    out = new PrintWriter(clientSocket.getOutputStream(), true);
+//                    in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                    in = new DataInputStream(clientSocket.getInputStream());
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                BufferedReader in = null;
-                try {
-                    in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                System.out.println(out);
+//                System.out.println(out);
                 System.out.println(in);
                 /*
                  * TODO: Fill in your server code that receives messages and passes them
@@ -183,14 +199,30 @@ public class SimpleMessengerActivity extends Activity {
                 String[] arr = new String[2];
     //            arr[0] = "lol";
                 try {
-                    arr[0] = in.readLine();
+//                    arr[0] = in.readLine();
+                    arr[0] = in.readUTF();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
                 publishProgress(arr);
+                try {
+                    clientSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
+
 //            return null;
         }
+
+//        protected void onPostExecute(ServerSocket... sockets) {
+//            ServerSocket serverSocket = sockets[0];
+//            try {
+//                serverSocket.close();
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//        }
 
         protected void onProgressUpdate(String...strings) {
             /*
@@ -252,7 +284,7 @@ public class SimpleMessengerActivity extends Activity {
                 out.writeUTF(msgToSend);
                 out.flush();
                 out.close();
-//                socket.close();
+                socket.close();
             } catch (UnknownHostException e) {
                 Log.e(TAG, "ClientTask UnknownHostException");
             } catch (IOException e) {
