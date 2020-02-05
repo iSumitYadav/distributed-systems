@@ -1,10 +1,10 @@
 package edu.buffalo.cse.cse486586.groupmessenger1;
 
-import android.content.ContentProvider;
-import android.content.ContentValues;
-import android.database.Cursor;
 import android.net.Uri;
 import android.util.Log;
+import android.database.Cursor;
+import android.content.ContentValues;
+import android.content.ContentProvider;
 
 /**
  * GroupMessengerProvider is a key-value table. Once again, please note that we do not implement
