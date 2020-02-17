@@ -6,10 +6,10 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.FileOutputStream;
 import java.net.UnknownHostException;
 
 
+import android.net.Uri;
 import android.util.Log;
 import android.os.Bundle;
 import android.view.Menu;
@@ -17,10 +17,10 @@ import android.view.View;
 import android.app.Activity;
 import android.os.AsyncTask;
 import android.widget.Button;
-//import android.graphics.Color;
 import android.widget.TextView;
 import android.widget.EditText;
 import android.content.Context;
+import android.content.ContentValues;
 import android.telephony.TelephonyManager;
 import android.text.method.ScrollingMovementMethod;
 
@@ -32,14 +32,9 @@ import android.text.method.ScrollingMovementMethod;
  */
 public class GroupMessengerActivity extends Activity {
     static final String TAG = GroupMessengerActivity.class.getSimpleName();
-    static final String[] PORTS = new String[]{"11108", "11112", "11116",
-            "11120", "11124"};
-//    static final String REMOTE_PORT0 = "11108";
-//    static final String REMOTE_PORT1 = "11112";
-//    static final String REMOTE_PORT2 = "11116";
-//    static final String REMOTE_PORT3 = "11120";
-//    static final String REMOTE_PORT4 = "11124";
+    static final String[] PORTS = new String[]{"11108", "11112", "11116", "11120", "11124"};
     static final int SERVER_PORT = 10000;
+    int seq_no = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,7 +46,6 @@ public class GroupMessengerActivity extends Activity {
          * on how you display the messages, if you implement it, it'll make your debugging easier.
          */
         TextView tv = (TextView) findViewById(R.id.textView1);
-//        tv.append("SampleText" + "\t\n");
         tv.setMovementMethod(new ScrollingMovementMethod());
         
         /*
@@ -79,7 +73,6 @@ public class GroupMessengerActivity extends Activity {
                 String msg = editText.getText().toString() + "\n";
                 editText.setText("");
                 TextView tv = (TextView) findViewById(R.id.textView1);
-//                tv.setTextColor(Color.RED);
                 tv.append(msg);
 
                 /*
@@ -123,7 +116,7 @@ public class GroupMessengerActivity extends Activity {
      * It is created by ClientTask.executeOnExecutor() call whenever OnKeyListener.onKey() detects
      * an enter key press event.
      *
-     * @author skumar34
+     * @author stevko
      *
      */
     private class ClientTask extends AsyncTask<String, Void, Void> {
@@ -161,7 +154,7 @@ public class GroupMessengerActivity extends Activity {
      * Please make sure you understand how AsyncTask works by reading
      * http://developer.android.com/reference/android/os/AsyncTask.html
      *
-     * @author skumar34
+     * @author stevko
      *
      */
     private class ServerTask extends AsyncTask<ServerSocket, String, Void> {
@@ -199,27 +192,14 @@ public class GroupMessengerActivity extends Activity {
              */
             String strReceived = strings[0].trim();
             TextView tv = (TextView) findViewById(R.id.textView1);
-//            tv.setTextColor(Color.BLUE);
-            tv.append("\t" + strReceived + "\n");
+            tv.append("\t" + seq_no + ":" + strReceived + "\n");
 
-            /*
-             * The following code creates a file in the AVD's internal storage and stores a file.
-             *
-             * For more information on file I/O on Android, please take a look at
-             * http://developer.android.com/training/basics/data-storage/files.html
-             */
+            ContentValues values = new ContentValues();
+            values.put(GroupMessengerProvider.COLUMN_NAME_KEY, Integer.toString(seq_no));
+            values.put(GroupMessengerProvider.COLUMN_NAME_VALUE, strReceived);
+            Uri uri = getContentResolver().insert(GroupMessengerProvider.CONTENT_URI, values);
 
-//            String filename = "SimpleMessengerOutput";
-//            String string = strReceived + "\n";
-//            FileOutputStream outputStream;
-//
-//            try {
-//                outputStream = openFileOutput(filename, Context.MODE_PRIVATE);
-//                outputStream.write(string.getBytes());
-//                outputStream.close();
-//            } catch (Exception e) {
-//                Log.e(TAG, "File write failed");
-//            }
+            seq_no++;
 
             return;
         }

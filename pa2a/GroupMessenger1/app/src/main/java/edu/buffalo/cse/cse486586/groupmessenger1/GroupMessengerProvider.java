@@ -3,8 +3,12 @@ package edu.buffalo.cse.cse486586.groupmessenger1;
 import android.net.Uri;
 import android.util.Log;
 import android.database.Cursor;
+import android.content.Context;
 import android.content.ContentValues;
 import android.content.ContentProvider;
+
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
 
 /**
  * GroupMessengerProvider is a key-value table. Once again, please note that we do not implement
@@ -25,6 +29,12 @@ import android.content.ContentProvider;
  *
  */
 public class GroupMessengerProvider extends ContentProvider {
+    static final Uri CONTENT_URI = Uri.parse("content://edu.buffalo.cse.cse486586.groupmessenger1.provider");
+
+    private SQLiteDatabase db;
+    public static final String TABLE_NAME = "messages";
+    public static final String COLUMN_NAME_KEY = "key";
+    public static final String COLUMN_NAME_VALUE = "value";
 
     @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
@@ -50,13 +60,22 @@ public class GroupMessengerProvider extends ContentProvider {
          * internal storage option that we used in PA1. If you want to use that option, please
          * take a look at the code for PA1.
          */
-        Log.v("insert", values.toString());
+
+        db.insert(TABLE_NAME, null, values);
+
         return uri;
     }
 
     @Override
     public boolean onCreate() {
         // If you need to perform any one-time initialization task, please do it here.
+        GroupMessengerDBHelper DBHelper = new GroupMessengerDBHelper(getContext());
+
+        db = DBHelper.getWritableDatabase();
+        if(db != null){
+            return true;
+        }
+
         return false;
     }
 
@@ -80,7 +99,46 @@ public class GroupMessengerProvider extends ContentProvider {
          * recommend building a MatrixCursor described at:
          * http://developer.android.com/reference/android/database/MatrixCursor.html
          */
+
+        String [] selectionArgss = new String[]{selection};
+        selection = COLUMN_NAME_KEY + "=?";
+
+        Cursor cursor = db.query(
+                TABLE_NAME,
+                projection,
+                selection,
+                selectionArgss,
+                null,
+                null,
+                sortOrder,
+                String.valueOf(1)
+        );
+
         Log.v("query", selection);
-        return null;
+
+        return cursor;
+    }
+
+    public class GroupMessengerDBHelper extends SQLiteOpenHelper{
+        public static final int DATABASE_VERSION = 1;
+//        public static final String DATABASE_NAME = "GroupMessenger.db";
+        private final String SQL_CREATE_TABLE = "CREATE TABLE " + TABLE_NAME + " (" + COLUMN_NAME_KEY + " TEXT," + COLUMN_NAME_VALUE + " TEXT)";
+
+        public GroupMessengerDBHelper(Context context) {
+            // Made in-memory database by not specifying 2nd arg name with
+            // DBName.
+            super(context, null, null, DATABASE_VERSION);
+        }
+
+        public void onCreate(SQLiteDatabase db) {
+            db.execSQL(SQL_CREATE_TABLE);
+        }
+
+        public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        }
+
+        public void onDowngrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+            onUpgrade(db, oldVersion, newVersion);
+        }
     }
 }
