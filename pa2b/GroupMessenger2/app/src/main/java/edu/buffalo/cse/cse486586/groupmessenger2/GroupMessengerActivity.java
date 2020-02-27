@@ -17,11 +17,15 @@ import android.view.View;
 import android.app.Activity;
 import android.os.AsyncTask;
 import android.widget.Button;
+import android.graphics.Color;
+import android.text.Spannable;
 import android.widget.TextView;
 import android.widget.EditText;
 import android.content.Context;
+import android.text.SpannableString;
 import android.content.ContentValues;
 import android.telephony.TelephonyManager;
+import android.text.style.ForegroundColorSpan;
 import android.text.method.ScrollingMovementMethod;
 
 /**
@@ -131,6 +135,10 @@ public class GroupMessengerActivity extends Activity {
                     DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
                     String msgToSend = msgs[0];
+                    String myPort = msgs[1];
+
+                    msgToSend += "::::" + myPort;
+
                     out.writeUTF(msgToSend);
                     out.flush();
                     out.close();
@@ -164,6 +172,7 @@ public class GroupMessengerActivity extends Activity {
             ServerSocket serverSocket = sockets[0];
 
             Socket clientSocket = null;
+
             while(true){
                 try {
                     clientSocket = serverSocket.accept();
@@ -190,13 +199,40 @@ public class GroupMessengerActivity extends Activity {
             /*
              * The following code displays what is received in doInBackground().
              */
-            String strReceived = strings[0].trim();
+
+            String msgPlusPort = strings[0];
+            String[] strReceived = msgPlusPort.split("::::", 2);
+
+            String msgReceived = strReceived[0];
+            String showMsgReceived = "\t" + msgReceived;
+            Spannable colorMsg = new SpannableString(showMsgReceived);
+
+            Integer port = Integer.parseInt(strReceived[1]);
+
+            switch (port){
+                case 11108:
+                    colorMsg.setSpan(new ForegroundColorSpan(Color.RED), 0, showMsgReceived.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    break;
+                case 11112:
+                    colorMsg.setSpan(new ForegroundColorSpan(Color.GREEN), 0, showMsgReceived.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    break;
+                case 11116:
+                    colorMsg.setSpan(new ForegroundColorSpan(Color.BLUE), 0, showMsgReceived.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    break;
+                case 11120:
+                    colorMsg.setSpan(new ForegroundColorSpan(Color.LTGRAY), 0, showMsgReceived.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    break;
+                case 11124:
+                    colorMsg.setSpan(new ForegroundColorSpan(Color.BLACK), 0, showMsgReceived.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    break;
+            }
+
             TextView tv = (TextView) findViewById(R.id.textView1);
-            tv.append("\t" + seq_no + ":" + strReceived + "\n");
+            tv.append(colorMsg);
 
             ContentValues values = new ContentValues();
             values.put(GroupMessengerProvider.COLUMN_NAME_KEY, Integer.toString(seq_no));
-            values.put(GroupMessengerProvider.COLUMN_NAME_VALUE, strReceived);
+            values.put(GroupMessengerProvider.COLUMN_NAME_VALUE, msgReceived);
             Uri uri = getContentResolver().insert(GroupMessengerProvider.CONTENT_URI, values);
 
             seq_no++;
