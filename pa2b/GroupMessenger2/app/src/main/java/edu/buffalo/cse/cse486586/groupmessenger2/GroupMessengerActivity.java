@@ -40,6 +40,8 @@ public class GroupMessengerActivity extends Activity {
     static final int SERVER_PORT = 10000;
     int seq_no = 0;
 
+    String myPort;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -68,7 +70,7 @@ public class GroupMessengerActivity extends Activity {
 
         TelephonyManager tel = (TelephonyManager) this.getSystemService(Context.TELEPHONY_SERVICE);
         String portStr = tel.getLine1Number().substring(tel.getLine1Number().length() - 4);
-        final String myPort = String.valueOf((Integer.parseInt(portStr) * 2));
+        myPort = String.valueOf((Integer.parseInt(portStr) * 2));
 
         sendButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -127,6 +129,8 @@ public class GroupMessengerActivity extends Activity {
 
         @Override
         protected Void doInBackground(String... msgs) {
+            final TextView tv = (TextView) findViewById(R.id.textView1);
+
             try {
                 for(int i=0; i<PORTS.length; i++){
                     String port = PORTS[i];
@@ -141,7 +145,21 @@ public class GroupMessengerActivity extends Activity {
 
                     out.writeUTF(msgToSend);
                     out.flush();
-                    out.close();
+//                    out.close();
+
+                    DataInputStream in = new DataInputStream(socket.getInputStream());
+                    final String ack = in.readUTF();
+                    in.close();
+//                    Log.d(TAG, ack);
+
+                    runOnUiThread(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            tv.append("\t\t\t\t\tAck: " + ack + "\n");
+                        }
+                    });
+
                     socket.close();
                 }
             } catch (UnknownHostException e) {
@@ -190,6 +208,17 @@ public class GroupMessengerActivity extends Activity {
                 try {
                     publishProgress(in.readUTF());
                 } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+                try {
+                    DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
+                    out.writeUTF("Msg Rcvd on " + myPort);
+                    out.flush();
+                    out.close();
+                    clientSocket.close();
+                } catch (IOException e) {
+                    Log.e(TAG, e.toString());
                     e.printStackTrace();
                 }
             }
