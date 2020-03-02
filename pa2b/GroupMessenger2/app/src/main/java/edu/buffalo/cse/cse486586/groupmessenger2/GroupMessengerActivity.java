@@ -208,7 +208,26 @@ public class GroupMessengerActivity extends Activity {
 
                 try {
                     readUTF = in.readUTF();
-                    publishProgress(readUTF);
+
+                    String msgPlusPort = readUTF;
+                    String[] strReceived = msgPlusPort.split("::::", 2);
+
+                    String msgReceived = strReceived[0];
+                    String showMsgReceived = "\t" + msgReceived;
+
+                    Integer port = Integer.parseInt(strReceived[1]);
+
+
+                    String[] forPublishProgress = new String[]{showMsgReceived, port.toString()};
+                    publishProgress(forPublishProgress);
+
+
+                    ContentValues values = new ContentValues();
+                    values.put(GroupMessengerProvider.COLUMN_NAME_KEY, Integer.toString(seq_no));
+                    values.put(GroupMessengerProvider.COLUMN_NAME_VALUE, msgReceived);
+                    Uri uri = getContentResolver().insert(GroupMessengerProvider.CONTENT_URI, values);
+
+                    seq_no++;
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -231,46 +250,34 @@ public class GroupMessengerActivity extends Activity {
              * The following code displays what is received in doInBackground().
              */
 
-            String msgPlusPort = strings[0];
-            String[] strReceived = msgPlusPort.split("::::", 2);
+            String showMsgReceived = strings[0];
+            Integer port = Integer.parseInt(strings[1]);
 
-            String msgReceived = strReceived[0];
-            String showMsgReceived = "\t" + msgReceived;
-
-            Integer port = Integer.parseInt(strReceived[1]);
-
-            Spannable colorMsg = new SpannableString(showMsgReceived);
-            ForegroundColorSpan fgColorSpan = new ForegroundColorSpan(Color.YELLOW);
+            int fgColor = Color.YELLOW;
 
             switch (port){
                 case 11108:
-                    fgColorSpan = new ForegroundColorSpan(Color.RED);
+                    fgColor = Color.RED;
                     break;
                 case 11112:
-                    fgColorSpan = new ForegroundColorSpan(Color.GREEN);
+                    fgColor = Color.GREEN;
                     break;
                 case 11116:
-                    fgColorSpan = new ForegroundColorSpan(Color.BLUE);
+                    fgColor = Color.BLUE;
                     break;
                 case 11120:
-                    fgColorSpan = new ForegroundColorSpan(Color.LTGRAY);
+                    fgColor = Color.LTGRAY;
                     break;
                 case 11124:
-                    fgColorSpan = new ForegroundColorSpan(Color.BLACK);
+                    fgColor = Color.BLACK;
                     break;
             }
 
+            Spannable colorMsg = new SpannableString(showMsgReceived);
+            colorMsg.setSpan(new ForegroundColorSpan(fgColor), 0, showMsgReceived.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+
             TextView tv = (TextView) findViewById(R.id.textView1);
-
-            colorMsg.setSpan(fgColorSpan, 0, showMsgReceived.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             tv.append(colorMsg);
-
-            ContentValues values = new ContentValues();
-            values.put(GroupMessengerProvider.COLUMN_NAME_KEY, Integer.toString(seq_no));
-            values.put(GroupMessengerProvider.COLUMN_NAME_VALUE, msgReceived);
-            Uri uri = getContentResolver().insert(GroupMessengerProvider.CONTENT_URI, values);
-
-            seq_no++;
 
             return;
         }
