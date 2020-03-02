@@ -1,5 +1,8 @@
 package edu.buffalo.cse.cse486586.groupmessenger2;
 
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.net.Socket;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -134,21 +137,30 @@ public class GroupMessengerActivity extends Activity {
             try {
                 for(int i=0; i<PORTS.length; i++){
                     String port = PORTS[i];
-
                     Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(port));
-                    DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 
                     String msgToSend = msgs[0];
                     String myPort = msgs[1];
 
                     msgToSend += "::::" + myPort;
+//                    DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+//                    out.writeUTF(msgToSend);
 
-                    out.writeUTF(msgToSend);
+                    messageStruct msgStruct = new messageStruct(msgToSend);
+                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+//                    out.defaultWriteObject();
+                    out.writeObject(msgStruct);
+
                     out.flush();
 //                    out.close();
 
-                    DataInputStream in = new DataInputStream(socket.getInputStream());
-                    final String ack = in.readUTF();
+//                    DataInputStream in = new DataInputStream(socket.getInputStream());
+//                    final String ack = in.readUTF();
+
+                    ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                    final messageStruct ack = (messageStruct) in.readObject();
+                    final String ackMsg = ack.msg;
+
                     in.close();
 //                    Log.d(TAG, ack);
 
@@ -156,7 +168,7 @@ public class GroupMessengerActivity extends Activity {
 
                         @Override
                         public void run() {
-                            tv.append("\t\t\t\t\tAck: " + ack + "\n");
+                            tv.append("\t\t\t\t\tAck: " + ackMsg + "\n");
                         }
                     });
 
@@ -164,6 +176,9 @@ public class GroupMessengerActivity extends Activity {
                 }
             } catch (UnknownHostException e) {
                 Log.e(TAG, "ClientTask UnknownHostException");
+            } catch (ClassNotFoundException e) {
+                Log.e(TAG, "Message class doesn't Exists");
+                e.printStackTrace();
             } catch (IOException e) {
                 Log.e(TAG, e.toString());
                 Log.e(TAG, "ClientTask socket IOException");
@@ -199,17 +214,21 @@ public class GroupMessengerActivity extends Activity {
                     e.printStackTrace();
                 }
 
-                DataInputStream in = null;
+//                DataInputStream in = null;
+                ObjectInputStream in = null;
                 try {
-                    in = new DataInputStream(clientSocket.getInputStream());
+//                    in = new DataInputStream(clientSocket.getInputStream());
+                    in = new ObjectInputStream(clientSocket.getInputStream());
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
 
                 try {
-                    readUTF = in.readUTF();
+//                    readUTF = in.readUTF();
+//                    String msgPlusPort = readUTF;
 
-                    String msgPlusPort = readUTF;
+                    messageStruct msgPlusPortObject = (messageStruct) in.readObject();
+                    String msgPlusPort = msgPlusPortObject.msg;
                     String[] strReceived = msgPlusPort.split("::::", 2);
 
                     String msgReceived = strReceived[0];
@@ -217,6 +236,8 @@ public class GroupMessengerActivity extends Activity {
 
                     Integer port = Integer.parseInt(strReceived[1]);
 
+//                    messageStruct msgStruct = new messageStruct(msgReceived);
+//                    Log.e(TAG, msgStruct.toString());
 
                     String[] forPublishProgress = new String[]{showMsgReceived, port.toString()};
                     publishProgress(forPublishProgress);
@@ -230,11 +251,17 @@ public class GroupMessengerActivity extends Activity {
                     seq_no++;
                 } catch (IOException e) {
                     e.printStackTrace();
+                } catch (ClassNotFoundException e) {
+                    Log.e(TAG, "Message class doesn't Exists");
+                    e.printStackTrace();
                 }
 
                 try {
-                    DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
-                    out.writeUTF("Msg Rcvd on " + myPort);
+//                    DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
+//                    out.writeUTF("Msg Rcvd on " + myPort);
+                    ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
+                    messageStruct ack = new messageStruct("Msg Rcvd on " + myPort);
+                    out.writeObject(ack);
                     out.flush();
                     out.close();
                     clientSocket.close();
@@ -250,10 +277,10 @@ public class GroupMessengerActivity extends Activity {
              * The following code displays what is received in doInBackground().
              */
 
+            int fgColor = Color.YELLOW;
             String showMsgReceived = strings[0];
             Integer port = Integer.parseInt(strings[1]);
 
-            int fgColor = Color.YELLOW;
 
             switch (port){
                 case 11108:
@@ -290,15 +317,20 @@ public class GroupMessengerActivity extends Activity {
         return true;
     }
 
+}
 
-    public class messageStruct{
-        String msg = "";
-        Integer proposedSeqNo = -1;
-        Integer finalSeqNo = -1;
-        Integer deliverable = -1;
 
-        public void messageStruct(String message){
-            msg = message;
-        }
+class messageStruct implements Serializable {
+    String msg, ackMsg;
+    Integer delivered, finalSeqNo, deliverable, proposedSeqNo;
+
+
+    public messageStruct(String message){
+        msg = message;
+
+        delivered = 0;
+        finalSeqNo = -1;
+        deliverable = 0;
+        proposedSeqNo = -1;
     }
 }
