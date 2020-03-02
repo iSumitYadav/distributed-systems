@@ -189,6 +189,7 @@ public class GroupMessengerActivity extends Activity {
         protected Void doInBackground(ServerSocket... sockets) {
             ServerSocket serverSocket = sockets[0];
 
+            String readUTF = null;
             Socket clientSocket = null;
 
             while(true){
@@ -206,7 +207,8 @@ public class GroupMessengerActivity extends Activity {
                 }
 
                 try {
-                    publishProgress(in.readUTF());
+                    readUTF = in.readUTF();
+                    publishProgress(readUTF);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -224,7 +226,7 @@ public class GroupMessengerActivity extends Activity {
             }
         }
 
-        protected void onProgressUpdate(String...strings) {
+        protected void onProgressUpdate(String... strings) {
             /*
              * The following code displays what is received in doInBackground().
              */
@@ -234,29 +236,33 @@ public class GroupMessengerActivity extends Activity {
 
             String msgReceived = strReceived[0];
             String showMsgReceived = "\t" + msgReceived;
-            Spannable colorMsg = new SpannableString(showMsgReceived);
 
             Integer port = Integer.parseInt(strReceived[1]);
 
+            Spannable colorMsg = new SpannableString(showMsgReceived);
+            ForegroundColorSpan fgColorSpan = new ForegroundColorSpan(Color.YELLOW);
+
             switch (port){
                 case 11108:
-                    colorMsg.setSpan(new ForegroundColorSpan(Color.RED), 0, showMsgReceived.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    fgColorSpan = new ForegroundColorSpan(Color.RED);
                     break;
                 case 11112:
-                    colorMsg.setSpan(new ForegroundColorSpan(Color.GREEN), 0, showMsgReceived.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    fgColorSpan = new ForegroundColorSpan(Color.GREEN);
                     break;
                 case 11116:
-                    colorMsg.setSpan(new ForegroundColorSpan(Color.BLUE), 0, showMsgReceived.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    fgColorSpan = new ForegroundColorSpan(Color.BLUE);
                     break;
                 case 11120:
-                    colorMsg.setSpan(new ForegroundColorSpan(Color.LTGRAY), 0, showMsgReceived.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    fgColorSpan = new ForegroundColorSpan(Color.LTGRAY);
                     break;
                 case 11124:
-                    colorMsg.setSpan(new ForegroundColorSpan(Color.BLACK), 0, showMsgReceived.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    fgColorSpan = new ForegroundColorSpan(Color.BLACK);
                     break;
             }
 
             TextView tv = (TextView) findViewById(R.id.textView1);
+
+            colorMsg.setSpan(fgColorSpan, 0, showMsgReceived.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             tv.append(colorMsg);
 
             ContentValues values = new ContentValues();
@@ -275,5 +281,17 @@ public class GroupMessengerActivity extends Activity {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.activity_group_messenger, menu);
         return true;
+    }
+
+
+    public class messageStruct{
+        String msg = "";
+        Integer proposedSeqNo = -1;
+        Integer finalSeqNo = -1;
+        Integer deliverable = -1;
+
+        public void messageStruct(String message){
+            msg = message;
+        }
     }
 }
