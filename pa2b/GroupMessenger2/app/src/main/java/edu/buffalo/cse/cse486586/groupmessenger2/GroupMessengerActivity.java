@@ -10,6 +10,9 @@ import java.net.ServerSocket;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.UnknownHostException;
+import java.util.Comparator;
+import java.util.PriorityQueue;
+import java.util.Iterator;
 
 
 import android.net.Uri;
@@ -17,6 +20,7 @@ import android.util.Log;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.View;
+import android.os.Process;
 import android.app.Activity;
 import android.os.AsyncTask;
 import android.widget.Button;
@@ -42,8 +46,13 @@ public class GroupMessengerActivity extends Activity {
     static final String[] PORTS = new String[]{"11108", "11112", "11116", "11120", "11124"};
     static final int SERVER_PORT = 10000;
     int seq_no = 0;
-
+    static final int process_id = Process.myPid();
     String myPort;
+    int accepted_seq_no = 0;
+    int proposedSeqNoPid = 0;
+//            Double.parseDouble("0." + Integer.toString(process_id));
+    PriorityQueue<messageStruct> clientq = new PriorityQueue<messageStruct>(10, new clientqcomp());
+//    Comparator clientqcomp = clientq.comparator();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -132,6 +141,7 @@ public class GroupMessengerActivity extends Activity {
 
         @Override
         protected Void doInBackground(String... msgs) {
+            messageStruct ack = new messageStruct();
             final TextView tv = (TextView) findViewById(R.id.textView1);
 
             try {
@@ -142,11 +152,12 @@ public class GroupMessengerActivity extends Activity {
                     String msgToSend = msgs[0];
                     String myPort = msgs[1];
 
-                    msgToSend += "::::" + myPort;
+//                    msgToSend += "::::" + myPort;
 //                    DataOutputStream out = new DataOutputStream(socket.getOutputStream());
 //                    out.writeUTF(msgToSend);
 
-                    messageStruct msgStruct = new messageStruct(msgToSend);
+                    messageStruct msgStruct = new messageStruct(msgToSend,
+                            Integer.parseInt(myPort), process_id);
                     ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
 //                    out.defaultWriteObject();
                     out.writeObject(msgStruct);
@@ -158,22 +169,132 @@ public class GroupMessengerActivity extends Activity {
 //                    final String ack = in.readUTF();
 
                     ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-                    final messageStruct ack = (messageStruct) in.readObject();
+                    ack = (messageStruct) in.readObject();
                     final String ackMsg = ack.msg;
+                    final Integer ackPort = ack.port;
 
                     in.close();
+
+                    if(ack.finalSeqNo == -1){
+                        clientq.add(ack);
+                    }
 //                    Log.d(TAG, ack);
 
+                    final int afsn = ack.finalSeqNo;
                     runOnUiThread(new Runnable() {
 
                         @Override
                         public void run() {
-                            tv.append("\t\t\t\t\tAck: " + ackMsg + "\n");
+                            tv.append("\t\t\t\t\tAck: " + ackMsg + " fsn" + Integer.toString(afsn) + "\n");
+//                            tv.append("\t\t\t\t\tproposedSeqNo.id: " + Double.toString(ack.proposedSeqNoPid) +"\n");
+
                         }
                     });
 
                     socket.close();
                 }
+
+//                runOnUiThread(new Runnable() {
+//
+//                    @Override
+//                    public void run() {
+//                        tv.append("\t\t\t\t\tpeek clientq: " + Double.toString(clientq.peek().proposedSeqNoPid) +
+//                                "\n");
+//
+//                    }
+//                });
+
+                final int ackseqno = ack.finalSeqNo;
+                if(ack.finalSeqNo == -1) {
+                    final Iterator<messageStruct> clientqItr = clientq.iterator();
+                    final messageStruct finalMsg = clientq.poll();
+                    runOnUiThread(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            tv.append("FinalSeqNo: " + Double.toString(finalMsg.proposedSeqNoPid) + "\n");
+
+                        }
+                    });
+                    int count = 0;
+                    while (clientqItr.hasNext()) {
+                        //                    Log.e(TAG, Double.toString(clientqItr.next().toString(proposedSeqNoPid)));
+                        final messageStruct temp = (messageStruct) clientqItr.next();
+
+                        if ((int) temp.proposedSeqNoPid == (int) finalMsg.proposedSeqNoPid) {
+                            //                        runOnUiThread(new Runnable() {
+                            //
+                            //                            @Override
+                            //                            public void run() {
+                            //                                tv.append("\t\t\t\t\tREMOVE peek clientq: " + Double.toString(temp.proposedSeqNoPid) + "\n");
+                            //
+                            //                            }
+                            //                        });
+                            //                        clientq.remove(temp);
+                            clientqItr.remove();
+                        }
+                    }
+
+                    // SECOND FOR LOOP
+                    for (int i = 0; i < PORTS.length; i++) {
+                        String port = PORTS[i];
+                        Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(port));
+
+                        //                    String msgToSend = msgs[0];
+                        //                    String myPort = msgs[1];
+
+                        //                    msgToSend += "::::" + myPort;
+                        //                    DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                        //                    out.writeUTF(msgToSend);
+
+                        finalMsg.finalSeqNo = (int) finalMsg.proposedSeqNoPid;
+                        finalMsg.port = Integer.parseInt(myPort);
+                        //                    messageStruct msgStruct = new messageStruct(msgToSend, Integer.parseInt(myPort), process_id);
+                        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                        //                    out.defaultWriteObject();
+                        out.writeObject(finalMsg);
+
+                        out.flush();
+                        //                    out.close();
+
+                        //                    DataInputStream in = new DataInputStream(socket.getInputStream());
+                        //                    final String ack = in.readUTF();
+
+                        //                    ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                        //                    final messageStruct ack = (messageStruct) in.readObject();
+                        //                    final String ackMsg = ack.msg;
+                        //                    final Integer ackPort = ack.port;
+                        //
+                        //                    in.close();
+                        //
+                        //                    clientq.add(ack);
+                        ////                    Log.d(TAG, ack);
+                        //
+                        //                    runOnUiThread(new Runnable() {
+                        //
+                        //                        @Override
+                        //                        public void run() {
+                        //                            tv.append("\t\t\t\t\tAck: " + ackMsg + " " + Integer.toString(ackPort) +
+                        //                                    "\n");
+                        //                            tv.append("\t\t\t\t\tproposedSeqNo.id: " + Double.toString(ack.proposedSeqNoPid) +
+                        //                                    "\n");
+                        //
+                        //                        }
+                        //                    });
+
+                        socket.close();
+                    }
+                }else{
+                    runOnUiThread(new Runnable() {
+
+                        @Override
+                        public void run() {
+                            tv.append("\t\t\t\t\tAck FinalSeqNo == -1: " + ackseqno + "\n");
+
+                        }
+                    });
+                }
+
             } catch (UnknownHostException e) {
                 Log.e(TAG, "ClientTask UnknownHostException");
             } catch (ClassNotFoundException e) {
@@ -222,33 +343,47 @@ public class GroupMessengerActivity extends Activity {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-
+                Log.e(TAG, Integer.toString(process_id));
+                messageStruct msgPlusPortObject = new messageStruct();
                 try {
 //                    readUTF = in.readUTF();
 //                    String msgPlusPort = readUTF;
-
-                    messageStruct msgPlusPortObject = (messageStruct) in.readObject();
+//                    Log.e(TAG, "1");
+                    msgPlusPortObject = (messageStruct) in.readObject();
                     String msgPlusPort = msgPlusPortObject.msg;
-                    String[] strReceived = msgPlusPort.split("::::", 2);
+//                    String[] strReceived = msgPlusPort.split("::::", 2);
 
-                    String msgReceived = strReceived[0];
+
+//                    String msgReceived = strReceived[0];
+                    String msgReceived = msgPlusPort;
                     String showMsgReceived = "\t" + msgReceived;
 
-                    Integer port = Integer.parseInt(strReceived[1]);
+                    Integer port = msgPlusPortObject.port;
+//                    Integer port = Integer.parseInt(strReceived[1]);
 
 //                    messageStruct msgStruct = new messageStruct(msgReceived);
 //                    Log.e(TAG, msgStruct.toString());
 
-                    String[] forPublishProgress = new String[]{showMsgReceived, port.toString()};
+//                    Log.e(TAG, Integer.toString(port));
+//                    Log.e(TAG, "2");
+
+                    Integer msgReceivedfrompid = msgPlusPortObject.pid;
+
+                    String[] forPublishProgress = new String[]{showMsgReceived, Integer.toString(port), Integer.toString(msgReceivedfrompid)};
+//                    Log.e(TAG, "3");
                     publishProgress(forPublishProgress);
 
 
-                    ContentValues values = new ContentValues();
-                    values.put(GroupMessengerProvider.COLUMN_NAME_KEY, Integer.toString(seq_no));
-                    values.put(GroupMessengerProvider.COLUMN_NAME_VALUE, msgReceived);
-                    Uri uri = getContentResolver().insert(GroupMessengerProvider.CONTENT_URI, values);
+                    if(msgPlusPortObject.finalSeqNo > -1){
+                        Log.e(TAG, "HERERERERE");
+                        ContentValues values = new ContentValues();
+                        values.put(GroupMessengerProvider.COLUMN_NAME_KEY, Integer.toString(seq_no));
+                        values.put(GroupMessengerProvider.COLUMN_NAME_VALUE, msgReceived);
+                        Uri uri = getContentResolver().insert(GroupMessengerProvider.CONTENT_URI, values);
 
-                    seq_no++;
+                        accepted_seq_no++;
+                        seq_no++;
+                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 } catch (ClassNotFoundException e) {
@@ -260,8 +395,13 @@ public class GroupMessengerActivity extends Activity {
 //                    DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
 //                    out.writeUTF("Msg Rcvd on " + myPort);
                     ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
-                    messageStruct ack = new messageStruct("Msg Rcvd on " + myPort);
-                    out.writeObject(ack);
+                    msgPlusPortObject.proposedSeqNoPid =
+                            Math.max(accepted_seq_no, proposedSeqNoPid) + 1;
+                    proposedSeqNoPid++;
+//                    messageStruct ack = new messageStruct("Msg Rcvd on ",
+//                            Integer.parseInt(myPort), process_id,
+//                            Double.parseDouble(Integer.toString(proposedSeqNoPid) + "." + Integer.toString(process_id)));
+                    out.writeObject(msgPlusPortObject);
                     out.flush();
                     out.close();
                     clientSocket.close();
@@ -280,6 +420,7 @@ public class GroupMessengerActivity extends Activity {
             int fgColor = Color.YELLOW;
             String showMsgReceived = strings[0];
             Integer port = Integer.parseInt(strings[1]);
+            Integer msgReceivedfrompid = Integer.parseInt(strings[2]);
 
 
             switch (port){
@@ -305,6 +446,7 @@ public class GroupMessengerActivity extends Activity {
 
             TextView tv = (TextView) findViewById(R.id.textView1);
             tv.append(colorMsg);
+            tv.append("msg sent from pid: " + msgReceivedfrompid + "\n");
 
             return;
         }
@@ -322,15 +464,59 @@ public class GroupMessengerActivity extends Activity {
 
 class messageStruct implements Serializable {
     String msg, ackMsg;
-    Integer delivered, finalSeqNo, deliverable, proposedSeqNo;
+    Integer delivered, finalSeqNo, deliverable, proposedSeqNo, port, pid;
+    double proposedSeqNoPid;
 
-
-    public messageStruct(String message){
-        msg = message;
-
+    public messageStruct(){
         delivered = 0;
         finalSeqNo = -1;
         deliverable = 0;
         proposedSeqNo = -1;
+        proposedSeqNoPid = -1.1;
+
+
+        msg = "";
+        pid = -1;
+        port = -1;
+    }
+
+
+    public messageStruct(String message, Integer avdport, Integer process_id,
+                         double proposedSeqNo_pid){
+        delivered = 0;
+        finalSeqNo = -1;
+        deliverable = 0;
+        proposedSeqNo = -1;
+
+
+        msg = message;
+        pid = process_id;
+        port = avdport;
+        proposedSeqNoPid = proposedSeqNo_pid;
+    }
+
+    public messageStruct(String message, Integer avdport, Integer process_id){
+        delivered = 0;
+        finalSeqNo = -1;
+        deliverable = 0;
+        proposedSeqNo = -1;
+        proposedSeqNoPid = -1.1;
+
+
+        msg = message;
+        pid = process_id;
+        port = avdport;
+    }
+}
+
+class clientqcomp implements Comparator<messageStruct> {
+
+    public int compare(messageStruct msg1, messageStruct msg2) {
+        if(msg1.proposedSeqNoPid < msg2.proposedSeqNoPid){
+            return 1;
+        }else if(msg1.proposedSeqNoPid > msg2.proposedSeqNoPid){
+            return -1;
+        }
+        return 0;
     }
 }
