@@ -3,6 +3,7 @@ package edu.buffalo.cse.cse486586.groupmessenger2;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.database.Cursor;
+import android.database.DatabaseUtils;
 import android.net.Uri;
 import android.util.Log;
 import android.view.View;
@@ -30,7 +31,7 @@ import android.widget.TextView;
 public class OnPTestClickListener implements OnClickListener {
 
     private static final String TAG = OnPTestClickListener.class.getName();
-    private static final int TEST_CNT = 50;
+    private static final int TEST_CNT = 25;
     private static final String KEY_FIELD = "key";
     private static final String VALUE_FIELD = "value";
 
@@ -73,12 +74,12 @@ public class OnPTestClickListener implements OnClickListener {
 
     @Override
     public void onClick(View v) {
-        if (testInsert()) {
-            mTextView.append("Insert success\n");
-        } else {
-            mTextView.append("Insert fail\n");
-            return;
-        }
+//        if (testInsert()) {
+//            mTextView.append("Insert success\n");
+//        } else {
+//            mTextView.append("Insert fail\n");
+//            return;
+//        }
 
         if (testQuery()) {
             mTextView.append("Query success\n");
@@ -119,43 +120,50 @@ public class OnPTestClickListener implements OnClickListener {
      */
     private boolean testQuery() {
         try {
+            mTextView.append("==============================================\n");
             for (int i = 0; i < TEST_CNT; i++) {
-                String key = (String) mContentValues[i].get(KEY_FIELD);
-                String val = (String) mContentValues[i].get(VALUE_FIELD);
+//                String key = (String) mContentValues[i].get(KEY_FIELD);
+//                String val = (String) mContentValues[i].get(VALUE_FIELD);
 
-                Cursor resultCursor = mContentResolver.query(mUri, null, key, null, null);
+                Cursor resultCursor = mContentResolver.query(mUri, null,
+                        Integer.toString(i),
+                        null, null);
                 if (resultCursor == null) {
                     Log.e(TAG, "Result null");
                     throw new Exception();
                 }
 
-                int keyIndex = resultCursor.getColumnIndex(KEY_FIELD);
-                int valueIndex = resultCursor.getColumnIndex(VALUE_FIELD);
-                if (keyIndex == -1 || valueIndex == -1) {
-                    Log.e(TAG, "Wrong columns");
-                    resultCursor.close();
-                    throw new Exception();
-                }
-
                 resultCursor.moveToFirst();
+                mTextView.append(Integer.toString(i) +":"+ resultCursor.getString(1));
 
-                if (!(resultCursor.isFirst() && resultCursor.isLast())) {
-                    Log.e(TAG, "Wrong number of rows");
-                    resultCursor.close();
-                    throw new Exception();
-                }
+//                int keyIndex = resultCursor.getColumnIndex(KEY_FIELD);
+//                int valueIndex = resultCursor.getColumnIndex(VALUE_FIELD);
+//                if (keyIndex == -1 || valueIndex == -1) {
+//                    Log.e(TAG, "Wrong columns");
+//                    resultCursor.close();
+//                    throw new Exception();
+//                }
 
-                String returnKey = resultCursor.getString(keyIndex);
-                String returnValue = resultCursor.getString(valueIndex);
-                if (!(returnKey.equals(key) && returnValue.equals(val))) {
-                    Log.e(TAG, "(key, value) pairs don't match\n");
-                    resultCursor.close();
-                    throw new Exception();
-                }
+//                resultCursor.moveToFirst();
+//
+//                if (!(resultCursor.isFirst() && resultCursor.isLast())) {
+//                    Log.e(TAG, "Wrong number of rows");
+//                    resultCursor.close();
+//                    throw new Exception();
+//                }
+
+//                String returnKey = resultCursor.getString(keyIndex);
+//                String returnValue = resultCursor.getString(valueIndex);
+//                if (!(returnKey.equals(key) && returnValue.equals(val))) {
+//                    Log.e(TAG, "(key, value) pairs don't match\n");
+//                    resultCursor.close();
+//                    throw new Exception();
+//                }
 
                 resultCursor.close();
             }
         } catch (Exception e) {
+            Log.e(TAG, "PTEST"+e.toString());
             return false;
         }
 

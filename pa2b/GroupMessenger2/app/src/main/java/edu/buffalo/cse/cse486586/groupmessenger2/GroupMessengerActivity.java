@@ -8,8 +8,10 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Random;
@@ -50,12 +52,14 @@ public class GroupMessengerActivity extends Activity {
     String myPort;
     int accepted_seq_no = 0;
     int proposedSeqNoPid = 0;
+    int cp_seq_no = 0;
 
     PriorityQueue<messageStruct> serverq =
             new PriorityQueue<messageStruct>(10, new serverqcomp());
 
     Map<Integer, Double> cdict = new HashMap<Integer, Double>();
 
+    ArrayList<messageStruct> serverlist = new ArrayList<messageStruct>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -150,66 +154,85 @@ public class GroupMessengerActivity extends Activity {
             final TextView tv = (TextView) findViewById(R.id.textView1);
 
 
-            try {
-                for(int i=0; i<PORTS.length; i++){
-                    String port = PORTS[i];
-                    Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(port));
 
-                    String msgToSend = msgs[0];
-                    String myPort = msgs[1];
+//            try {
+                for(int i=0; i<PORTS.length; i++) {
+                    try {
+                        String port = PORTS[i];
+                        Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(port));
+                        socket.setSoTimeout(100);
 
-                    messageStruct msgStruct = new messageStruct(
-                            msgToSend,
-                            Integer.parseInt(myPort)
-                    );
+                        String msgToSend = msgs[0];
+                        Log.e(TAG, "msgs msgToSend: "+msgs[0] +" to " + port);
+                        String myPort = msgs[1];
 
-                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                        messageStruct msgStruct = new messageStruct(
+                                msgToSend,
+                                Integer.parseInt(myPort)
+                        );
 
-                    if(!cdict.containsKey(msgStruct.r)) {
-                        cdict.put(msgStruct.r, -1.1);
+                        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+
+                        if (!cdict.containsKey(msgStruct.r)) {
+                            cdict.put(msgStruct.r, -1.1);
+                        }
+
+                        out.writeObject(msgStruct);
+                        out.flush();
+
+
+                        ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                        ack = (messageStruct) in.readObject();
+
+                        Double psn_pid =
+                                Double.parseDouble(Integer.toString(ack.proposedSeqNo) + "." + Integer.toString(ack.pid));
+                        if (cdict.get(ack.r) < psn_pid) {
+                            cdict.remove(ack.r);
+                            cdict.put(ack.r, psn_pid);
+                            finalMsg = ack;
+                        }
+
+                        in.close();
+                        socket.close();
+                    } catch (Exception e){
+                        Log.e(TAG, "Client 1 ExceptionFinal: " + e.toString());
+                        e.printStackTrace();
+                        continue;
                     }
-
-                    out.writeObject(msgStruct);
-                    out.flush();
-
-
-                    ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-                    ack = (messageStruct) in.readObject();
-
-                    Double psn_pid =
-                            Double.parseDouble(Integer.toString(ack.proposedSeqNo) + "." + Integer.toString(ack.pid));
-                    if(cdict.get(ack.r) < psn_pid){
-                        cdict.remove(ack.r);
-                        cdict.put(ack.r, psn_pid);
-                        finalMsg = ack;
-                    }
-
-                    in.close();
-                    socket.close();
                 }
+
 
 
                 for (int i = 0; i < PORTS.length; i++) {
-                    String port = PORTS[i];
-                    Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(port));
+                    try {
+                        String port = PORTS[i];
+                        Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(port));
+                        socket.setSoTimeout(100);
 
-                    finalMsg.deliverable = 1;
+                        finalMsg.deliverable = 1;
 
-                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                    out.writeObject(finalMsg);
-                    out.flush();
-                    socket.close();
+                        Log.e(TAG,
+                                "msgs deliverable: "+finalMsg.msg +" to " + port);
+                        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                        out.writeObject(finalMsg);
+                        out.flush();
+                        socket.close();
+                    } catch (Exception e){
+                        Log.e(TAG, "Client 2 ExceptionFinal: " + e.toString());
+                        e.printStackTrace();
+                        continue;
+                    }
                 }
 
-            } catch (UnknownHostException e) {
-                Log.e(TAG, "ClientTask UnknownHostException");
-            } catch (ClassNotFoundException e) {
-                Log.e(TAG, "Message class doesn't Exists");
-                e.printStackTrace();
-            } catch (IOException e) {
-                Log.e(TAG, e.toString());
-                Log.e(TAG, "ClientTask socket IOException");
-            }
+//            } catch (UnknownHostException e) {
+//                Log.e(TAG, "ClientTask UnknownHostException");
+//            } catch (ClassNotFoundException e) {
+//                Log.e(TAG, "Message class doesn't Exists");
+//                e.printStackTrace();
+//            } catch (IOException e) {
+//                Log.e(TAG, e.toString());
+//                Log.e(TAG, "ClientTask socket IOException");
+//            }
 
             return null;
         }
@@ -233,34 +256,46 @@ public class GroupMessengerActivity extends Activity {
 
             String readUTF = null;
             Socket clientSocket = null;
+            messageStruct msgPlusPortObject = new messageStruct();
+            int counter = 0;
 
             while(true){
                 try {
                     clientSocket = serverSocket.accept();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                    clientSocket.setSoTimeout(100);
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                    continue;
+//                }
 
                 ObjectInputStream in = null;
-                try {
+//                try {
                     in = new ObjectInputStream(clientSocket.getInputStream());
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                    continue;
+//                }
 
-                messageStruct msgPlusPortObject = new messageStruct();
-                try {
+//
+//                try {
 
                     msgPlusPortObject = (messageStruct) in.readObject();
 
 
-                    if(msgPlusPortObject.deliverable == 1){
+                    if (msgPlusPortObject.deliverable == 1) {
                         serverq.add(msgPlusPortObject);
                     }
 
-                    if(!serverq.isEmpty() && serverq.peek().deliverable == 1){
-                        if(seq_no + 1 == serverq.peek().proposedSeqNo){
+                    if (!serverq.isEmpty() && serverq.peek().deliverable == 1) {
+
+                        if(counter >= 10){
+                            Log.e(TAG, "counter >= 10");
+//                            seq_no++;
+                            counter = 0;
+                        }
+                        if (accepted_seq_no + 1 == serverq.peek().proposedSeqNo) {
                             messageStruct m = serverq.poll();
+                            serverlist.add(m);
 
                             Log.e(TAG,
                                     "Msg: " + m.msg + " : " + Double.parseDouble(Integer.toString(m.proposedSeqNo) + "." + Integer.toString(m.pid)));
@@ -276,27 +311,41 @@ public class GroupMessengerActivity extends Activity {
                                             Integer.toString(m.proposedSeqNo)};
 
 
+                            publishProgress(forPublishProgress);
+
+
+//                            These commented with line messageStruct m =
+//                            serverq.poll(); above
                             ContentValues values = new ContentValues();
                             values.put(GroupMessengerProvider.COLUMN_NAME_KEY, Integer.toString(seq_no));
                             values.put(GroupMessengerProvider.COLUMN_NAME_VALUE, m.msg);
                             Uri uri = getContentResolver().insert(GroupMessengerProvider.CONTENT_URI, values);
-
                             accepted_seq_no = m.proposedSeqNo;
                             seq_no++;
-
-                            publishProgress(forPublishProgress);
+                        }else{
+                            counter++;
+                            Log.e(TAG, "counter ++");
                         }
                     }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } catch (ClassNotFoundException e) {
-                    Log.e(TAG, "Message class doesn't Exists");
-                    e.printStackTrace();
-                }
+//                } catch (Exception e) {
+//                    while(serverqitr.hasNext()){
+//                        messageStruct tmpm = (messageStruct) serverqitr.next();
+//                        if(tmpm.port == msgPlusPortObject.port){
+//                            serverqitr.remove();
+//                        }
+//                    }
+//                    continue;
+//                }
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                } catch (ClassNotFoundException e) {
+//                    Log.e(TAG, "Message class doesn't Exists");
+//                    e.printStackTrace();
+//                }
 
-                try {
+//                try {
 
-                    if(msgPlusPortObject.deliverable != 1) {
+                    if (msgPlusPortObject.deliverable != 1) {
                         ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
 
                         msgPlusPortObject.proposedSeqNo = Math.max(accepted_seq_no, proposedSeqNoPid) + 1;
@@ -308,10 +357,37 @@ public class GroupMessengerActivity extends Activity {
                         out.close();
                     }
                     clientSocket.close();
-                } catch (IOException e) {
-                    Log.e(TAG, e.toString());
+                } catch (Exception e){
+                    Log.e(TAG, "Server ExceptionFinal: " + e.toString());
                     e.printStackTrace();
+//                    Iterator<messageStruct> serverqitr = serverlist.iterator();
+//
+//                    while(serverqitr.hasNext()){
+//                        messageStruct tmpm = (messageStruct) serverqitr.next();
+//
+//                        if(tmpm.proposedSeqNo == msgPlusPortObject.proposedSeqNo && tmpm.port == msgPlusPortObject.port){
+//                            serverqitr.remove();
+//                        }
+//                    }
+//
+//                    serverqitr = serverlist.iterator();
+//                    while(serverqitr.hasNext()){
+//                        messageStruct m = (messageStruct) serverqitr.next();
+//
+//                        ContentValues values = new ContentValues();
+//                        values.put(GroupMessengerProvider.COLUMN_NAME_KEY,
+//                                Integer.toString(cp_seq_no));
+//                        values.put(GroupMessengerProvider.COLUMN_NAME_VALUE, m.msg);
+//                        Uri uri = getContentResolver().insert(GroupMessengerProvider.CONTENT_URI, values);
+//                        cp_seq_no++;
+//                    }
+                    continue;
                 }
+//                } catch (IOException e) {
+//                    Log.e(TAG, e.toString());
+//                    e.printStackTrace();
+//                    continue;
+//                }
             }
         }
 
