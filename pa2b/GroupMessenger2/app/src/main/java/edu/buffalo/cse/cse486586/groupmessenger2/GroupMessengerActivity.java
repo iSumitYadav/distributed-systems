@@ -157,7 +157,7 @@ public class GroupMessengerActivity extends Activity {
 
             String port = "";
 
-//            try {
+
                 for(int i=0; i<PORTS.length; i++) {
                     try {
                         port = PORTS[i];
@@ -230,16 +230,6 @@ public class GroupMessengerActivity extends Activity {
                     }
                 }
 
-//            } catch (UnknownHostException e) {
-//                Log.e(TAG, "ClientTask UnknownHostException");
-//            } catch (ClassNotFoundException e) {
-//                Log.e(TAG, "Message class doesn't Exists");
-//                e.printStackTrace();
-//            } catch (IOException e) {
-//                Log.e(TAG, e.toString());
-//                Log.e(TAG, "ClientTask socket IOException");
-//            }
-
             return null;
         }
     }
@@ -269,21 +259,11 @@ public class GroupMessengerActivity extends Activity {
                 try {
                     clientSocket = serverSocket.accept();
                     clientSocket.setSoTimeout(100);
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                    continue;
-//                }
+
 
                 ObjectInputStream in = null;
-//                try {
-                    in = new ObjectInputStream(clientSocket.getInputStream());
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                    continue;
-//                }
 
-//
-//                try {
+                    in = new ObjectInputStream(clientSocket.getInputStream());
 
                     msgPlusPortObject = (messageStruct) in.readObject();
 
@@ -292,17 +272,7 @@ public class GroupMessengerActivity extends Activity {
                         serverq.add(msgPlusPortObject);
                     }
 
-//                    if (!serverq.isEmpty() && serverq.peek().deliverable == 1) {
 
-//                        if(counter >= 10){
-//                            Log.e(TAG, "counter >= 10");
-////                            seq_no++;
-//                            counter = 0;
-//                        }
-//                        Log.e(TAG,
-//                                "ASN: "+Integer.toString(accepted_seq_no+1) +
-//                                        " PSN: " + Integer.toString(serverq.peek().proposedSeqNo));
-//                        while(!serverq.isEmpty() && serverq.peek().deliverable == 1 && accepted_seq_no + 1 == serverq.peek().proposedSeqNo) {
                     while(!serverq.isEmpty() && serverq.peek().deliverable == 1 && accepted_seq_no + 1 == serverq.peek().proposedSeqNo) {
                             messageStruct m = serverq.poll();
 
@@ -327,8 +297,6 @@ public class GroupMessengerActivity extends Activity {
                                 publishProgress(forPublishProgress);
 
 
-//                            These commented with line messageStruct m =
-//                            serverq.poll(); above
                                 ContentValues values = new ContentValues();
                                 values.put(GroupMessengerProvider.COLUMN_NAME_KEY, Integer.toString(seq_no));
                                 values.put(GroupMessengerProvider.COLUMN_NAME_VALUE, m.msg);
@@ -337,28 +305,6 @@ public class GroupMessengerActivity extends Activity {
                                 seq_no++;
                             }
                         }
-//                        else{
-//                            counter++;
-//                            Log.e(TAG, "counter ++");
-//                        }
-//                    }
-//                } catch (Exception e) {
-//                    while(serverqitr.hasNext()){
-//                        messageStruct tmpm = (messageStruct) serverqitr.next();
-//                        if(tmpm.port == msgPlusPortObject.port){
-//                            serverqitr.remove();
-//                        }
-//                    }
-//                    continue;
-//                }
-//                } catch (IOException e) {
-//                    e.printStackTrace();
-//                } catch (ClassNotFoundException e) {
-//                    Log.e(TAG, "Message class doesn't Exists");
-//                    e.printStackTrace();
-//                }
-
-//                try {
 
                     if (msgPlusPortObject.deliverable != 1) {
                         ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
@@ -375,34 +321,8 @@ public class GroupMessengerActivity extends Activity {
                 } catch (Exception e){
                     Log.e(TAG, "Server ExceptionFinal: " + e.toString());
                     e.printStackTrace();
-//                    Iterator<messageStruct> serverqitr = serverlist.iterator();
-//
-//                    while(serverqitr.hasNext()){
-//                        messageStruct tmpm = (messageStruct) serverqitr.next();
-//
-//                        if(tmpm.proposedSeqNo == msgPlusPortObject.proposedSeqNo && tmpm.port == msgPlusPortObject.port){
-//                            serverqitr.remove();
-//                        }
-//                    }
-//
-//                    serverqitr = serverlist.iterator();
-//                    while(serverqitr.hasNext()){
-//                        messageStruct m = (messageStruct) serverqitr.next();
-//
-//                        ContentValues values = new ContentValues();
-//                        values.put(GroupMessengerProvider.COLUMN_NAME_KEY,
-//                                Integer.toString(cp_seq_no));
-//                        values.put(GroupMessengerProvider.COLUMN_NAME_VALUE, m.msg);
-//                        Uri uri = getContentResolver().insert(GroupMessengerProvider.CONTENT_URI, values);
-//                        cp_seq_no++;
-//                    }
                     continue;
                 }
-//                } catch (IOException e) {
-//                    Log.e(TAG, e.toString());
-//                    e.printStackTrace();
-//                    continue;
-//                }
             }
         }
 
