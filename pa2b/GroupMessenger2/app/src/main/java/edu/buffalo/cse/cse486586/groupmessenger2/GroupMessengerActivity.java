@@ -7,11 +7,8 @@ import java.net.Socket;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
-import java.net.UnknownHostException;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Random;
@@ -52,15 +49,11 @@ public class GroupMessengerActivity extends Activity {
     String myPort;
     int accepted_seq_no = 0;
     int proposedSeqNoPid = 0;
-    int cp_seq_no = 0;
     int failed_port = -1;
 
-    PriorityQueue<messageStruct> serverq =
-            new PriorityQueue<messageStruct>(10, new serverqcomp());
+    PriorityQueue<messageStruct> serverq = new PriorityQueue<messageStruct>(10, new serverqcomp());
 
     Map<Integer, Double> cdict = new HashMap<Integer, Double>();
-
-    ArrayList<messageStruct> serverlist = new ArrayList<messageStruct>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -152,83 +145,80 @@ public class GroupMessengerActivity extends Activity {
             messageStruct ack = new messageStruct();
             messageStruct finalMsg = new messageStruct();
 
-            final TextView tv = (TextView) findViewById(R.id.textView1);
-
-
             String port = "";
 
+            for(int i=0; i<PORTS.length; i++) {
+                try {
+                    port = PORTS[i];
+                    Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(port));
+                    socket.setSoTimeout(100);
 
-                for(int i=0; i<PORTS.length; i++) {
-                    try {
-                        port = PORTS[i];
-                        Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(port));
-                        socket.setSoTimeout(100);
+                    String msgToSend = msgs[0];
+                    Log.e(TAG, "msgs msgToSend: "+msgs[0] +" to " + port);
+                    String myPort = msgs[1];
 
-                        String msgToSend = msgs[0];
-                        Log.e(TAG, "msgs msgToSend: "+msgs[0] +" to " + port);
-                        String myPort = msgs[1];
+                    messageStruct msgStruct = new messageStruct(
+                            msgToSend,
+                            Integer.parseInt(myPort)
+                    );
 
-                        messageStruct msgStruct = new messageStruct(
-                                msgToSend,
-                                Integer.parseInt(myPort)
-                        );
+                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
 
-                        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-
-                        if (!cdict.containsKey(msgStruct.r)) {
-                            cdict.put(msgStruct.r, -1.1);
-                        }
-
-                        out.writeObject(msgStruct);
-                        out.flush();
-
-
-                        ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-                        ack = (messageStruct) in.readObject();
-
-                        Double psn_pid =
-                                Double.parseDouble(Integer.toString(ack.proposedSeqNo) + "." + Integer.toString(ack.pid));
-                        if (cdict.get(ack.r) < psn_pid) {
-                            cdict.remove(ack.r);
-                            cdict.put(ack.r, psn_pid);
-                            finalMsg = ack;
-                        }
-
-                        in.close();
-                        socket.close();
-                    } catch (Exception e){
-                        Log.e(TAG, "Client 1 ExceptionFinal: " + e.toString());
-                        Log.e(TAG, "ClientPort 1 ExceptionFinal: " + port);
-                        failed_port = Integer.parseInt(port);
-                        e.printStackTrace();
-                        continue;
+                    if (!cdict.containsKey(msgStruct.r)) {
+                        cdict.put(msgStruct.r, -1.1);
                     }
-                }
+
+                    out.writeObject(msgStruct);
+                    out.flush();
 
 
 
-                for (int i = 0; i < PORTS.length; i++) {
-                    try {
-                        port = PORTS[i];
-                        Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(port));
-                        socket.setSoTimeout(100);
 
-                        finalMsg.deliverable = 1;
+                    ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+                    ack = (messageStruct) in.readObject();
 
-                        Log.e(TAG,
-                                "msgs deliverable: "+finalMsg.msg +" to " + port);
-                        ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                        out.writeObject(finalMsg);
-                        out.flush();
-                        socket.close();
-                    } catch (Exception e){
-                        Log.e(TAG, "Client 2 ExceptionFinal: " + e.toString());
-                        Log.e(TAG, "ClientPort 2 ExceptionFinal: " + port);
-                        failed_port = Integer.parseInt(port);
-                        e.printStackTrace();
-                        continue;
+                    Double psn_pid = Double.parseDouble(Integer.toString(ack.proposedSeqNo) + "." + Integer.toString(ack.pid));
+                    if (cdict.get(ack.r) < psn_pid) {
+                        cdict.remove(ack.r);
+                        cdict.put(ack.r, psn_pid);
+                        finalMsg = ack;
                     }
+
+                    in.close();
+                    socket.close();
+                } catch (Exception e){
+                    Log.e(TAG, "Client 1 ExceptionFinal: " + e.toString());
+                    Log.e(TAG, "ClientPort 1 ExceptionFinal: " + port);
+                    failed_port = Integer.parseInt(port);
+                    e.printStackTrace();
+                    continue;
                 }
+            }
+
+
+
+            for (int i = 0; i < PORTS.length; i++) {
+                try {
+                    port = PORTS[i];
+                    Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(port));
+                    socket.setSoTimeout(100);
+
+                    finalMsg.deliverable = 1;
+
+                    Log.e(TAG, "msgs deliverable: "+finalMsg.msg +" to " + port);
+
+                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                    out.writeObject(finalMsg);
+                    out.flush();
+                    socket.close();
+                } catch (Exception e){
+                    Log.e(TAG, "Client 2 ExceptionFinal: " + e.toString());
+                    Log.e(TAG, "ClientPort 2 ExceptionFinal: " + port);
+                    failed_port = Integer.parseInt(port);
+                    e.printStackTrace();
+                    continue;
+                }
+            }
 
             return null;
         }
@@ -250,10 +240,8 @@ public class GroupMessengerActivity extends Activity {
         protected Void doInBackground(ServerSocket... sockets) {
             ServerSocket serverSocket = sockets[0];
 
-            String readUTF = null;
             Socket clientSocket = null;
             messageStruct msgPlusPortObject = new messageStruct();
-            int counter = 0;
 
             while(true){
                 try {
@@ -261,50 +249,43 @@ public class GroupMessengerActivity extends Activity {
                     clientSocket.setSoTimeout(100);
 
 
-                ObjectInputStream in = null;
-
+                    ObjectInputStream in = null;
                     in = new ObjectInputStream(clientSocket.getInputStream());
 
-                    msgPlusPortObject = (messageStruct) in.readObject();
 
+                    msgPlusPortObject = (messageStruct) in.readObject();
 
                     if (msgPlusPortObject.deliverable == 1) {
                         serverq.add(msgPlusPortObject);
                     }
 
 
-                    while(!serverq.isEmpty() && serverq.peek().deliverable == 1 && accepted_seq_no + 1 == serverq.peek().proposedSeqNo) {
-                            messageStruct m = serverq.poll();
+                    while(!serverq.isEmpty() && serverq.peek().deliverable == 1 && accepted_seq_no + 1 == serverq.peek().proposedSeqNo){
+                        messageStruct m = serverq.poll();
 
-                            if(failed_port != -1 || failed_port != m.port) {
+                        if(failed_port != -1 || failed_port != m.port) {
 
-                                serverlist.add(m);
+                            Log.e(TAG, "Msg: " + m.msg + " : " + Double.parseDouble(Integer.toString(m.proposedSeqNo) + "." + Integer.toString(m.pid)));
+                            String msgReceived = m.msg;
+                            String showMsgReceived = "\t" + msgReceived;
+                            Integer port = m.port;
 
-                                Log.e(TAG,
-                                        "Msg: " + m.msg + " : " + Double.parseDouble(Integer.toString(m.proposedSeqNo) + "." + Integer.toString(m.pid)));
-                                String msgReceived = m.msg;
-                                String showMsgReceived = "\t" + msgReceived;
-                                Integer port = m.port;
-
-                                Integer msgReceivedfrompid = m.pid;
-                                String[] forPublishProgress =
-                                        new String[]{showMsgReceived,
-                                                Integer.toString(port),
-                                                Integer.toString(msgReceivedfrompid),
-                                                Integer.toString(m.proposedSeqNo)};
+                            Integer msgReceivedfrompid = m.pid;
+                            String[] forPublishProgress = new String[]{showMsgReceived, Integer.toString(port), Integer.toString(msgReceivedfrompid), Integer.toString(m.proposedSeqNo)};
 
 
-                                publishProgress(forPublishProgress);
+                            publishProgress(forPublishProgress);
 
 
-                                ContentValues values = new ContentValues();
-                                values.put(GroupMessengerProvider.COLUMN_NAME_KEY, Integer.toString(seq_no));
-                                values.put(GroupMessengerProvider.COLUMN_NAME_VALUE, m.msg);
-                                Uri uri = getContentResolver().insert(GroupMessengerProvider.CONTENT_URI, values);
-                                accepted_seq_no = m.proposedSeqNo;
-                                seq_no++;
-                            }
+                            ContentValues values = new ContentValues();
+                            values.put(GroupMessengerProvider.COLUMN_NAME_KEY, Integer.toString(seq_no));
+                            values.put(GroupMessengerProvider.COLUMN_NAME_VALUE, m.msg);
+                            Uri uri = getContentResolver().insert(GroupMessengerProvider.CONTENT_URI, values);
+
+                            accepted_seq_no = m.proposedSeqNo;
+                            seq_no++;
                         }
+                    }
 
                     if (msgPlusPortObject.deliverable != 1) {
                         ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
@@ -317,6 +298,7 @@ public class GroupMessengerActivity extends Activity {
                         out.flush();
                         out.close();
                     }
+
                     clientSocket.close();
                 } catch (Exception e){
                     Log.e(TAG, "Server ExceptionFinal: " + e.toString());
