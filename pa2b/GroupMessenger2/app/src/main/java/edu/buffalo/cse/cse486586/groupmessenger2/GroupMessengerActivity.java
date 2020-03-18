@@ -302,7 +302,8 @@ public class GroupMessengerActivity extends Activity {
 //                        Log.e(TAG,
 //                                "ASN: "+Integer.toString(accepted_seq_no+1) +
 //                                        " PSN: " + Integer.toString(serverq.peek().proposedSeqNo));
-                        while(!serverq.isEmpty() && serverq.peek().deliverable == 1 && accepted_seq_no + 1 == serverq.peek().proposedSeqNo) {
+//                        while(!serverq.isEmpty() && serverq.peek().deliverable == 1 && accepted_seq_no + 1 == serverq.peek().proposedSeqNo) {
+                    while(!serverq.isEmpty() && serverq.peek().deliverable == 1 && accepted_seq_no + 1 == serverq.peek().proposedSeqNo) {
                             messageStruct m = serverq.poll();
 
                             if(failed_port != -1 || failed_port != m.port) {
