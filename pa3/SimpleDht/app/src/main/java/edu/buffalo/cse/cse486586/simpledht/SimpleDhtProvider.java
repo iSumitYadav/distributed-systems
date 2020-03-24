@@ -25,6 +25,8 @@ public class SimpleDhtProvider extends ContentProvider {
     public static final String COLUMN_NAME_KEY = "key";
     public static final String COLUMN_NAME_VALUE = "value";
 
+    static final String TAG = SimpleDhtActivity.class.getSimpleName();
+
     @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
         // TODO Auto-generated method stub
@@ -40,6 +42,7 @@ public class SimpleDhtProvider extends ContentProvider {
     @Override
     public Uri insert(Uri uri, ContentValues values) {
         // TODO Auto-generated method stub
+
         db.insert(TABLE_NAME, null, values);
 
         return uri;
@@ -62,11 +65,26 @@ public class SimpleDhtProvider extends ContentProvider {
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
         // TODO Auto-generated method stub
 
-        String [] selectionArgss = new String[]{selection};
+        Cursor cursor;
 
-        selection = COLUMN_NAME_KEY + "=?";
+        if(selection.equals("*") || selection.equals("@")){
+            cursor = db.query(
+                TABLE_NAME,
+                projection,
+                null,
+                null,
+                null,
+                null,
+                sortOrder,
+                null
+            );
+            Log.d("qKEY", selection);
+        }else{
+            String[] selectionArgss = new String[]{selection};
 
-        Cursor cursor = db.query(
+            selection = COLUMN_NAME_KEY + "=?";
+
+            cursor = db.query(
                 TABLE_NAME,
                 projection,
                 selection,
@@ -74,12 +92,13 @@ public class SimpleDhtProvider extends ContentProvider {
                 null,
                 null,
                 sortOrder,
-                String.valueOf(1)
-        );
+                "1"
+            );
 
-        Log.d("qKEY", selectionArgss[0].toString());
-        cursor.moveToFirst();
-        Log.d("qVALUE", cursor.getString(1));
+            Log.d("qKEY", selectionArgss[0].toString());
+            cursor.moveToFirst();
+            Log.d("qVALUE", cursor.getString(1));
+        }
 
         return cursor;
     }
