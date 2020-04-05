@@ -124,8 +124,7 @@ public class SimpleDhtProvider extends ContentProvider {
         private final String SQL_CREATE_TABLE = "CREATE TABLE " + TABLE_NAME + " (" + COLUMN_NAME_KEY + " TEXT," + COLUMN_NAME_VALUE + " TEXT)";
 
         public SimpleDHTDBHelper(Context context) {
-            // Made in-memory database by not specifying 2nd arg name with
-            // DBName.
+//            Made in-memory database by not specifying 2nd arg name with DBName.
             super(context, null, null, DATABASE_VERSION);
         }
 
