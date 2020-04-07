@@ -27,7 +27,7 @@ public class SimpleDhtActivity extends Activity {
             }
         });
 
-        
+
         final Button GDump = (Button) findViewById(R.id.button2);
         GDump.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {

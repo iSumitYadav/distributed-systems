@@ -131,6 +131,8 @@ public class OnTestClickListener implements OnClickListener {
                     resultCursor.close();
                 }
             } catch (Exception e) {
+                Log.e(TAG, e.toString());
+                e.printStackTrace();
                 return false;
             }
 
