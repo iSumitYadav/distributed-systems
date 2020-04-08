@@ -12,9 +12,11 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 
+import android.annotation.SuppressLint;
 import android.database.DatabaseUtils;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.telephony.TelephonyManager;
 
@@ -25,6 +27,7 @@ import android.content.ContentProvider;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.widget.TextView;
 
 
 public class SimpleDhtProvider extends ContentProvider {
@@ -45,6 +48,8 @@ public class SimpleDhtProvider extends ContentProvider {
 
     String successor = null;
     String predecessor = null;
+    String successorHash = null;
+    String predecessorHash = null;
 
 //    TelephonyManager tel = (TelephonyManager) getContext().getSystemService(Context.TELEPHONY_SERVICE);
 //    String portStr = tel.getLine1Number().substring(tel.getLine1Number().length() - 4);
@@ -66,11 +71,27 @@ public class SimpleDhtProvider extends ContentProvider {
     @Override
     public Uri insert(Uri uri, ContentValues values) {
         // TODO Auto-generated method stub
-        String key = (String) values.get("key");
+
+        String originatorPort = myPort;
+        if (values.containsKey("originator")){
+            originatorPort = (String) values.get("originator");
+            values.remove("originator");
+        }
+
+        String originalKey = (String) values.get("key");
+        String hashedKey = null;
         try {
-            key = genHash(key);
+            hashedKey = genHash(originalKey);
         } catch (NoSuchAlgorithmException e) {
             Log.e(TAG, "CP insert " + e.toString());
+        }
+
+        try {
+            if (predecessor != null) {
+                predecessorHash = genHash(String.valueOf((Integer.parseInt(predecessor) / 2)));
+            }
+        } catch (NoSuchAlgorithmException e) {
+            Log.e(TAG, "predecessorHash " + e.toString());
         }
 
 //        String node1 = genHash("5554");
@@ -87,13 +108,42 @@ public class SimpleDhtProvider extends ContentProvider {
 //        String node5 = genHash("11124");
 //        Relation is as follows: 4 < 2 < 3 < 1 < 5
 
+        Log.d(TAG,
+                "CP insert start myport" + myPort + " key " + originalKey +
+                        " hashedKey " + hashedKey);
+        Log.d(TAG,
+                "CP insert myport " + myPort + " originatorPort " + originatorPort + " .equals " + Boolean.toString(myPort.equals(originatorPort)));
         if (successor == null) {
+            Log.d(TAG, "CP insert succ NULL myport" + myPort + " key " + originalKey);
             db.insert(TABLE_NAME, null, values);
-        } else if (myPortHash.compareTo(key) >= 0 && key.compareTo(predecessor) > 0) {
+        } else if (myPortHash.compareTo(hashedKey) >= 0 && hashedKey.compareTo(predecessorHash) > 0) {
+            Log.d(TAG, "CP insert NODE FOUND myport" + myPort + " key " + originalKey);
             db.insert(TABLE_NAME, null, values);
+//        } else if (myPort.equals(originatorPort) && (myPortHash.compareTo(hashedKey) < 0 && predecessorHash.compareTo(hashedKey) < 0) || (myPortHash.compareTo(hashedKey) > 0 && predecessorHash.compareTo(hashedKey) > 0)) {
+        } else if ((myPortHash.compareTo(hashedKey) < 0 && predecessorHash.compareTo(hashedKey) < 0) || (myPortHash.compareTo(hashedKey) > 0 && predecessorHash.compareTo(hashedKey) > 0)) {
+            Log.d(TAG, "CP insert bw last node before 2^m -1 myport" + myPort + " key " + originalKey);
+
+            if (myPort.equals(originatorPort)) {
+                db.insert(TABLE_NAME, null, values);
+            } else {
+                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", successor, originalKey, (String) values.get("value"), originatorPort);
+            }
+//        } else if (myPortHash.compareTo(hashedKey) > 0 && predecessorHash.compareTo(hashedKey) > 0){
+//            Log.d(TAG, "CP insert bw last node after 0 but before first node" + " myport" + myPort + " key " + originalKey);
+//
+//            if (originatorPort != null && myPort.equals(originatorPort)) {
+//                db.insert(TABLE_NAME, null, values);
+//            } else {
+//                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", successor, originalKey, (String) values.get("value"), originatorPort);
+//            }
         } else {
-            new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", successor, (String) values.get("key"), (String) values.get("value"));
+            Log.d(TAG,
+                    "CP insert referred to succ " + successor + " myport" + myPort + " key " + originalKey);
+            new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR,
+                    "insert", successor, originalKey, (String) values.get(
+                            "value"), null);
         }
+        Log.d(TAG, "CP insert done myport" + myPort + " key " + originalKey);
 
         return uri;
     }
@@ -102,6 +152,7 @@ public class SimpleDhtProvider extends ContentProvider {
     public boolean onCreate() {
         // TODO Auto-generated method stub
         try {
+            Log.d(TAG, "cp onCreate Start");
             SimpleDHTDBHelper DBHelper = new SimpleDHTDBHelper(getContext());
 
             TelephonyManager tel = (TelephonyManager) getContext().getSystemService(Context.TELEPHONY_SERVICE);
@@ -109,8 +160,10 @@ public class SimpleDhtProvider extends ContentProvider {
             myPort = String.valueOf((Integer.parseInt(portStr) * 2));
 
             try {
+                Log.d(TAG, "cp onCreate start server");
                 ServerSocket serverSocket = new ServerSocket(SERVER_PORT);
                 new ServerTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, serverSocket);
+                Log.d(TAG, "cp onCreate server started");
             } catch (IOException e) {
                 Log.e(TAG, e.toString());
                 Log.e(TAG, "Can't create a ServerSocket");
@@ -123,15 +176,22 @@ public class SimpleDhtProvider extends ContentProvider {
                 Log.e(TAG, "CP onCreate myPortHash " + e.toString());
             }
 
-            if (myPort.equals(CONNECT_PORT)) {
-                predecessor = null;
-            } else {
+
+            if (!myPort.equals(CONNECT_PORT)) {
                 // connect to 5554
-                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "connect", CONNECT_PORT);
+                Log.d(TAG, "cp onCreate CONNECT_PORT from "+myPort);
+                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR,
+                        "connect", CONNECT_PORT, myPort);
+                Log.d(TAG, "cp onCreate CONNECT_PORT done from "+myPort);
             }
+
+//            final TextView tv = (TextView) findViewById(R.id.textView1);
+//            tv.setMovementMethod(new ScrollingMovementMethod());
+//            findViewById(R.id.button3).setOnClickListener(new OnTestClickListener(tv, getContentResolver()));
 
 
             db = DBHelper.getWritableDatabase();
+            Log.d(TAG, "cp onCreate stop");
             if (db != null) {
                 return true;
             }
@@ -147,6 +207,8 @@ public class SimpleDhtProvider extends ContentProvider {
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
         // TODO Auto-generated method stub
         Cursor cursor;
+
+        Log.d(TAG, "GLOBAL myPort: " + myPort + "," + " succ: "+ successor + ", " + "pred: "+predecessor);
 
         Log.d(TAG, selection);
         if (selection.equals("*") || selection.equals("@")) {
@@ -171,7 +233,15 @@ public class SimpleDhtProvider extends ContentProvider {
                 Log.e(TAG, "CP query " + e.toString());
             }
 
-            if (predecessor == null || (myPortHash.compareTo(hashKey) >= 0 && hashKey.compareTo(predecessor) > 0)) {
+            try {
+                if (predecessor != null) {
+                    predecessorHash = genHash(String.valueOf((Integer.parseInt(predecessor) / 2)));
+                }
+            } catch (NoSuchAlgorithmException e) {
+                Log.e(TAG, "predecessorHash " + e.toString());
+            }
+
+            if (predecessor == null || (myPortHash.compareTo(hashKey) >= 0 && hashKey.compareTo(predecessorHash) > 0)) {
                 String[] selectionArgss = new String[]{selection};
 
                 selection = COLUMN_NAME_KEY + "=?";
@@ -221,19 +291,26 @@ public class SimpleDhtProvider extends ContentProvider {
 
             String port = "";
             String msgType = msgs[0];
+            String nxtSuccessor = msgs[1];
 
-            if (msgType.equals("connect")) {
+            if (msgType.equals("connect") && !myPort.equals(CONNECT_PORT)) {
                 try {
-                    Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(CONNECT_PORT));
-                    socket.setSoTimeout(100);
+                    String originatorPort = msgs[2];
+                    Log.d(TAG,
+                            "ClientTask connect started from " + msgs[2] + " " +
+                                    "for "+nxtSuccessor);
+                    Socket socket =
+                            new Socket(InetAddress.getByAddress(new byte[]{10
+                                    , 0, 2, 2}), Integer.parseInt(nxtSuccessor));
+//                    socket.setSoTimeout(100);
 
 //                    String msgToSend = msgs[0];
 //                    Log.e(TAG, "msgs msgToSend: "+msgs[0] +" to " + port);
-                    String myPort = msgs[1];
+//                    String myPort = nxtSuccessor;
 
                     messageStruct msgStruct = new messageStruct(
                         msgType,
-                        myPort
+                        msgs[2]
                     );
 
                     ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
@@ -245,12 +322,28 @@ public class SimpleDhtProvider extends ContentProvider {
                     out.writeObject(msgStruct);
                     out.flush();
 
+                    Log.d(TAG,
+                            "ClientTask connect msg out from " + msgs[2] + " " +
+                                    "for "+nxtSuccessor);
 
                     ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
                     ack = (messageStruct) in.readObject();
 
+//                    if (ack.successor == null || ack.predecessor == null) {
+//
+//                    }
                     successor = ack.successor;
                     predecessor = ack.predecessor;
+
+//                    final String myPortFinal = myPort;
+                    Log.d(TAG, "ClientTask connect ack in from " + msgs[2] + " for "+nxtSuccessor);
+                    Log.d(TAG, "ClientTask connect myPort: " + msgs[2] + ", " + "succ: "+ successor + ", pred: "+predecessor);
+//                    tv.append("myPort: " + myPort + ", succ: "+ successor + ", pred: "+predecessor);
+//                    tv.post(new Runnable() {
+//                        public void run() {
+//                            tv.append("myPort: " + myPortFinal + ", succ: "+ successor + ", pred: "+predecessor);
+//                        }
+//                    });
 
 //                    Double psn_pid = Double.parseDouble(Integer.toString(ack.proposedSeqNo) + "." + Integer.toString(ack.pid));
 //                    if (cdict.get(ack.r) < psn_pid) {
@@ -261,28 +354,32 @@ public class SimpleDhtProvider extends ContentProvider {
 
                     in.close();
                     socket.close();
+                    Log.d(TAG, "ClientTask connect done from " + msgs[2] + " " +
+                            "for "+nxtSuccessor);
                 } catch (Exception e) {
-                    Log.e(TAG, "Client 1 ExceptionFinal: " + e.toString());
+                    Log.e(TAG, "Client connect ExceptionFinal: " + e.toString());
 //                    Log.e(TAG, "ClientPort 1 ExceptionFinal: " + port);
 //                    failed_port = Integer.parseInt(port);
                     e.printStackTrace();
 //                    continue;
                 }
             } else if (msgType.equals("insert")) {
-                String nxtSuccessor = msgs[1];
                 String key = msgs[2];
                 String value = msgs[3];
+                String originatorPort = msgs[4];
 
                 try {
+                    Log.d(TAG, "ClientTask insert started from " + myPort + " for "+nxtSuccessor + " key " +key);
                     Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
-                    socket.setSoTimeout(100);
+//                    socket.setSoTimeout(100);
 
 //                    String msgToSend = msgs[0];
 //                    Log.e(TAG, "msgs msgToSend: "+msgs[0] +" to " + port);
-                    String myPort = msgs[1];
+//                    String myPort = msgs[1];
 
                     messageStruct msgStruct = new messageStruct(
                         msgType,
+                        originatorPort,
                         key,
                         value
                     );
@@ -296,6 +393,7 @@ public class SimpleDhtProvider extends ContentProvider {
                     out.writeObject(msgStruct);
                     out.flush();
 
+                    Log.d(TAG, "ClientTask insert msg out from " + myPort + " for "+nxtSuccessor + " key " +key);
 
 //                    ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
 //                    ack = (messageStruct) in.readObject();
@@ -309,20 +407,20 @@ public class SimpleDhtProvider extends ContentProvider {
 //
 //                    in.close();
                     socket.close();
+                    Log.d(TAG, "ClientTask insert done from " + myPort + " for "+nxtSuccessor + " key " +key);
                 } catch (Exception e) {
-                    Log.e(TAG, "Client 1 ExceptionFinal: " + e.toString());
+                    Log.e(TAG, "Client insert ExceptionFinal: " + e.toString());
 //                    Log.e(TAG, "ClientPort 1 ExceptionFinal: " + port);
 //                    failed_port = Integer.parseInt(port);
                     e.printStackTrace();
 //                    continue;
                 }
             } else if (msgType.equals("search")) {
-                String nxtSuccessor = msgs[1];
                 String key = msgs[2];
 
                 try {
                     Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
-                    socket.setSoTimeout(100);
+//                    socket.setSoTimeout(100);
 
 //                    String msgToSend = msgs[0];
 //                    Log.e(TAG, "msgs msgToSend: "+msgs[0] +" to " + port);
@@ -356,7 +454,7 @@ public class SimpleDhtProvider extends ContentProvider {
                     in.close();
                     socket.close();
                 } catch (Exception e) {
-                    Log.e(TAG, "Client 1 ExceptionFinal: " + e.toString());
+                    Log.e(TAG, "Client search ExceptionFinal: " + e.toString());
 //                    Log.e(TAG, "ClientPort 1 ExceptionFinal: " + port);
 //                    failed_port = Integer.parseInt(port);
                     e.printStackTrace();
@@ -396,17 +494,21 @@ public class SimpleDhtProvider extends ContentProvider {
 
     private class ServerTask extends AsyncTask<ServerSocket, String, Void> {
 
+        @SuppressLint("WrongThread")
         @Override
         protected Void doInBackground(ServerSocket... sockets) {
             ServerSocket serverSocket = sockets[0];
 
-            Socket clientSocket = null;
             messageStruct msgPlusPortObject = new messageStruct();
 
             while(true){
+                Log.d(TAG,
+                        "GLOBAL myPort: " + myPort + "," +
+                                " succ: "+ successor + ", pred: "+predecessor);
                 try {
+                    Socket clientSocket = null;
                     clientSocket = serverSocket.accept();
-                    clientSocket.setSoTimeout(100);
+//                    clientSocket.setSoTimeout(100);
 
                     ObjectInputStream in = null;
                     in = new ObjectInputStream(clientSocket.getInputStream());
@@ -415,42 +517,111 @@ public class SimpleDhtProvider extends ContentProvider {
 
                     if (msgPlusPortObject.msg.equals("connect")) {
                         String newNodeHash = null;
-                        String port = msgPlusPortObject.port.toString();
+//                        String port = msgPlusPortObject.port.toString();
+                        String port = msgPlusPortObject.port;
+
+                        Log.d(TAG,
+                                "Connect Request to myPort: " + myPort + "," +
+                                        " succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
 
                         try{
                             Integer emulatorId = Integer.parseInt(port)/2;
                             newNodeHash = genHash(emulatorId.toString());
                         } catch (NoSuchAlgorithmException e) {
-                            Log.e(TAG, "newNode join " + e.toString());
+                            Log.e(TAG, "emulatorId hash " + e.toString());
                         }
 
-                        if (myPort.equals(CONNECT_PORT)) {
-                            if (successor == null) {
-                                predecessor = port;
-                                successor = port;
-                            } else if (successor.compareTo(newNodeHash) >= 0 && myPortHash.compareTo(newNodeHash) < 0) {
-                                ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
-
-                                msgPlusPortObject.predecessor = myPort;
-                                msgPlusPortObject.successor = successor;
-
-                                successor = port;
-
-                                out.writeObject(msgPlusPortObject);
-                                out.flush();
-                                out.close();
-                            } else {
-                                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "connect", successor);
+                        try{
+                            if (successor != null) {
+                                successorHash = genHash(String.valueOf((Integer.parseInt(successor) / 2)));
                             }
-                        } else {
-//                             Can't happen coz all join requests are handled by 5554 only
+                        } catch (NoSuchAlgorithmException e) {
+                            Log.e(TAG, "successorHash " + e.toString());
                         }
+
+                        try{
+                            if (predecessor != null) {
+                                predecessorHash = genHash(String.valueOf((Integer.parseInt(predecessor) / 2)));
+                            }
+                        } catch (NoSuchAlgorithmException e) {
+                            Log.e(TAG, "predecessorHash " + e.toString());
+                        }
+                        Log.d(TAG,
+                                "Connect Request in bw1 to myPort: " + myPort +
+                                        "," +
+                                        " succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
+                        ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
+                        Log.d(TAG,
+                                "Connect Request in bw2 to myPort: " + myPort +
+                                        "," +
+                                        " succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
+//                        if (myPort.equals(CONNECT_PORT)) {
+                        if (successor == null) {
+                            predecessor = port;
+                            successor = port;
+
+                            Log.d(TAG, " Succ is Null myPort: " + myPort + ", succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
+
+                            msgPlusPortObject.successor = CONNECT_PORT;
+                            msgPlusPortObject.predecessor = CONNECT_PORT;
+
+//                            out.writeObject(msgPlusPortObject);
+//                            out.flush();
+//                            out.close();
+                        } else if (successorHash.compareTo(newNodeHash) >= 0 && myPortHash.compareTo(newNodeHash) < 0) {
+                            msgPlusPortObject.predecessor = myPort;
+                            msgPlusPortObject.successor = successor;
+
+                            successor = port;
+
+                            Log.d(TAG, " Succ in bw myPort: " + myPort + ", " +
+                                    "succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
+
+//                            out.writeObject(msgPlusPortObject);
+//                            out.flush();
+//                            out.close();
+                        } else if (predecessorHash.compareTo(newNodeHash) < 0 && myPortHash.compareTo(newNodeHash) >= 0) {
+                            msgPlusPortObject.predecessor = predecessor;
+                            msgPlusPortObject.successor = myPort;
+
+                            predecessor = port;
+
+                            Log.d(TAG, " pred in bw myPort: " + myPort + ", " +
+                                    "succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
+
+//                            out.writeObject(msgPlusPortObject);
+//                            out.flush();
+//                            out.close();
+                        } else if (!port.equals(CONNECT_PORT)) {
+                            Log.d(TAG,
+                                    " req to succ myPort: " + myPort + ", " + "succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
+                            new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "connect", successor, port);
+                            Log.d(TAG,
+                                    " req made to succ myPort: " + myPort +
+                                            ", " +
+                                            "succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
+//                            out.writeObject(msgPlusPortObject);
+//                            out.flush();
+//                            out.close();
+                        }
+//                        } else {
+////                             Can't happen coz all join requests are handled by 5554 only
+//                        }
+                        out.writeObject(msgPlusPortObject);
+                        out.flush();
+                        out.close();
                     } else if (msgPlusPortObject.msg.equals("insert")) {
+                        Log.d(TAG,
+                                "ServerTask insert start from " + msgPlusPortObject.msg + " for " + myPort + " for key " + msgPlusPortObject.key);
                         ContentValues values = new ContentValues();
                         values.put(SimpleDhtProvider.COLUMN_NAME_KEY, msgPlusPortObject.key);
                         values.put(SimpleDhtProvider.COLUMN_NAME_VALUE, msgPlusPortObject.value);
+                        if (msgPlusPortObject.originator != null) {
+                            values.put("originator", msgPlusPortObject.originator);
+                        }
 //                        Uri uri = getContentResolver().insert(SimpleDhtProvider.CONTENT_URI, values);
                         insert(CONTENT_URI, values);
+                        Log.d(TAG, "ServerTask insert done from " + msgPlusPortObject.msg + " for " + myPort + " for key " + msgPlusPortObject.key);
                     } else if (msgPlusPortObject.msg.equals("search")) {
                         query(CONTENT_URI, null, msgPlusPortObject.key, null, null);
                     }
@@ -499,7 +670,7 @@ public class SimpleDhtProvider extends ContentProvider {
                 } catch (Exception e){
                     Log.e(TAG, "Server ExceptionFinal: " + e.toString());
                     e.printStackTrace();
-                    continue;
+//                    continue;
                 }
             }
         }
@@ -581,28 +752,29 @@ public class SimpleDhtProvider extends ContentProvider {
             onUpgrade(db, oldVersion, newVersion);
         }
     }
+}
 
-    class messageStruct implements Serializable {
-        String msg, port, key, value, successor, predecessor;
+class messageStruct implements Serializable {
+    String msg, port, key, value, successor, predecessor, originator;
 
-        public messageStruct(){
-            msg = "";
-            port = null;
-            successor = null;
-            predecessor = null;
-        }
+    public messageStruct(){
+        msg = "";
+        port = null;
+        successor = null;
+        predecessor = null;
+    }
 
-        public messageStruct(String message, String avdport){
-            msg = message;
-            port = avdport;
-            successor = null;
-            predecessor = null;
-        }
+    public messageStruct(String message, String avdport){
+        msg = message;
+        port = avdport;
+        successor = null;
+        predecessor = null;
+    }
 
-        public messageStruct(String message, String _key, String _value){
-            msg = message;
-            key = _key;
-            value = _value;
-        }
+    public messageStruct(String message, String _originator, String _key, String _value){
+        msg = message;
+        originator = _originator;
+        key = _key;
+        value = _value;
     }
 }
