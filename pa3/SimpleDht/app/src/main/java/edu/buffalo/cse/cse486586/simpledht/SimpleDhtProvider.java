@@ -94,20 +94,6 @@ public class SimpleDhtProvider extends ContentProvider {
             Log.e(TAG, "predecessorHash " + e.toString());
         }
 
-//        String node1 = genHash("5554");
-//        String node2 = genHash("5556");
-//        String node3 = genHash("5558");
-//        String node4 = genHash("5560");
-//        String node5 = genHash("5562");
-//        Relation is as follows: 5 < 2 < 1 < 3 < 4
-
-//        String node1 = genHash("11108");
-//        String node2 = genHash("11112");
-//        String node3 = genHash("11116");
-//        String node4 = genHash("11120");
-//        String node5 = genHash("11124");
-//        Relation is as follows: 4 < 2 < 3 < 1 < 5
-
         Log.d(TAG,
                 "CP insert start myport" + myPort + " key " + originalKey +
                         " hashedKey " + hashedKey);
@@ -371,50 +357,49 @@ public class SimpleDhtProvider extends ContentProvider {
                     e.printStackTrace();
 //                    continue;
                 }
-            } else if (msgType.equals("connectTo")) {
-                try {
-                    String originatorPort = msgs[2];
-                    Log.d(TAG,
-                            "ClientTask connect started from " + msgs[2] + " " +
-                                    "for " + nxtSuccessor);
-                    Socket socket =
-                            new Socket(InetAddress.getByAddress(new byte[]{10
-                                    , 0, 2, 2}), Integer.parseInt(nxtSuccessor));
-
-
-                    messageStruct msgStruct = new messageStruct(
-                            msgType,
-                            msgs[2]
-                    );
-
-                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-                    out.writeObject(msgStruct);
-                    out.flush();
-
+//            } else if (msgType.equals("connectTo")) {
+//                try {
+//                    String originatorPort = msgs[2];
 //                    Log.d(TAG,
-//                            "ClientTask connect msg out from " + msgs[2] + " " +
+//                            "ClientTask connect started from " + msgs[2] + " " +
 //                                    "for " + nxtSuccessor);
-
-
-
-//                    final String myPortFinal = myPort;
-//                    Log.d(TAG, "ClientTask connect ack in from " + msgs[2] + " for " + nxtSuccessor);
-//                    Log.d(TAG, "ClientTask connect myPort: " + msgs[2] + ", " + "succ: " + successor + ", pred: " + predecessor);
-
-//                    in.close();
-                    socket.close();
-//                    Log.d(TAG, "ClientTask connect done from " + msgs[2] + " " +
-//                            "for " + nxtSuccessor);
-                } catch (Exception e) {
-                    Log.e(TAG,
-                            "Client connectTo ExceptionFinal: " + e.toString());
-//                    Log.e(TAG, "ClientPort 1 ExceptionFinal: " + port);
-//                    failed_port = Integer.parseInt(port);
-                    e.printStackTrace();
-//                    continue;
-                }
-            }
-            else if (msgType.equals("adjustRing")) {
+//                    Socket socket =
+//                            new Socket(InetAddress.getByAddress(new byte[]{10
+//                                    , 0, 2, 2}), Integer.parseInt(nxtSuccessor));
+//
+//
+//                    messageStruct msgStruct = new messageStruct(
+//                            msgType,
+//                            msgs[2]
+//                    );
+//
+//                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+//                    out.writeObject(msgStruct);
+//                    out.flush();
+//
+////                    Log.d(TAG,
+////                            "ClientTask connect msg out from " + msgs[2] + " " +
+////                                    "for " + nxtSuccessor);
+//
+//
+//
+////                    final String myPortFinal = myPort;
+////                    Log.d(TAG, "ClientTask connect ack in from " + msgs[2] + " for " + nxtSuccessor);
+////                    Log.d(TAG, "ClientTask connect myPort: " + msgs[2] + ", " + "succ: " + successor + ", pred: " + predecessor);
+//
+////                    in.close();
+//                    socket.close();
+////                    Log.d(TAG, "ClientTask connect done from " + msgs[2] + " " +
+////                            "for " + nxtSuccessor);
+//                } catch (Exception e) {
+//                    Log.e(TAG,
+//                            "Client connectTo ExceptionFinal: " + e.toString());
+////                    Log.e(TAG, "ClientPort 1 ExceptionFinal: " + port);
+////                    failed_port = Integer.parseInt(port);
+//                    e.printStackTrace();
+////                    continue;
+//                }
+            } else if (msgType.equals("adjustRing")) {
 //                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "adjustRing", successor, "predecessor", port);
                 try {
                     String adjustPort = msgs[1];
@@ -664,38 +649,185 @@ public class SimpleDhtProvider extends ContentProvider {
 //                            out.flush();
 //                            out.close();
                         } else if (successor == predecessor) {
-                            if (newNodeHash.compareTo(successorHash) > 0 && newNodeHash.compareTo(predecessorHash) > 0) {
-                                msgPlusPortObject.predecessor = myPort;
-                                msgPlusPortObject.successor = successor;
+                            if (newNodeHash.compareTo(successorHash) > 0) {
+                                if (newNodeHash.compareTo(myPortHash) < 0) {
+                                    String[] forPublishProgress = new String[]{
+                                            "adjustRing",
+                                            predecessor,
+                                            "successor",
+                                            port
+                                    };
+                                    publishProgress(forPublishProgress);
 
-//                                Req to pred to adjust its pred to port
-//                                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "adjustRing", predecessor, "predecessor", port);
-                                String[] forPublishProgress = new String[]{
-                                    "adjustRing",
-                                    predecessor,
-                                    "predecessor",
-                                    port
-                                };
-                                publishProgress(forPublishProgress);
+                                    forPublishProgress = new String[]{
+                                            "adjustRing",
+                                            port,
+                                            "successor",
+                                            myPort
+                                    };
+                                    publishProgress(forPublishProgress);
 
+                                    forPublishProgress = new String[]{
+                                            "adjustRing",
+                                            port,
+                                            "predecessor",
+                                            predecessor
+                                    };
+                                    publishProgress(forPublishProgress);
 
-                                successor = port;
-                            } else if (newNodeHash.compareTo(successorHash) < 0 && newNodeHash.compareTo(predecessorHash) < 0) {
-                                msgPlusPortObject.predecessor = successor;
-                                msgPlusPortObject.successor = myPort;
+                                    predecessor = port;
+                                } else if (newNodeHash.compareTo(myPortHash) > 0) {
+                                    if (myPortHash.compareTo(successorHash) > 0) {
+                                        String[] forPublishProgress = new String[]{
+                                                "adjustRing",
+                                                port,
+                                                "predecessor",
+                                                myPort
+                                        };
+                                        publishProgress(forPublishProgress);
 
-//                                Req to succ to adjust its succ to port
-//                                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "adjustRing", successor, "successor", port);
-                                String[] forPublishProgress = new String[]{
-                                    "adjustRing",
-                                    successor,
-                                    "successor",
-                                    port
-                                };
-                                publishProgress(forPublishProgress);
+                                        forPublishProgress = new String[]{
+                                                "adjustRing",
+                                                port,
+                                                "successor",
+                                                successor
+                                        };
+                                        publishProgress(forPublishProgress);
 
+                                        forPublishProgress = new String[]{
+                                                "adjustRing",
+                                                successor,
+                                                "predecessor",
+                                                port
+                                        };
+                                        publishProgress(forPublishProgress);
 
-                                predecessor = port;
+                                        successor = port;
+                                    } else {
+                                        String[] forPublishProgress = new String[]{
+                                                "adjustRing",
+                                                port,
+                                                "predecessor",
+                                                successor
+                                        };
+                                        publishProgress(forPublishProgress);
+
+                                        forPublishProgress = new String[]{
+                                                "adjustRing",
+                                                port,
+                                                "successor",
+                                                myPort
+                                        };
+                                        publishProgress(forPublishProgress);
+
+                                        forPublishProgress = new String[]{
+                                                "adjustRing",
+                                                successor,
+                                                "successor",
+                                                port
+                                        };
+                                        publishProgress(forPublishProgress);
+
+                                        predecessor = port;
+                                    }
+                                }
+                            } else if (newNodeHash.compareTo(successorHash) < 0) {
+                                if (newNodeHash.compareTo(myPortHash) < 0) {
+                                    if (myPortHash.compareTo(successorHash) > 0) {
+                                        String[] forPublishProgress = new String[]{
+                                                "adjustRing",
+                                                successor,
+                                                "predecessor",
+                                                port
+                                        };
+                                        publishProgress(forPublishProgress);
+
+                                        forPublishProgress = new String[]{
+                                                "adjustRing",
+                                                port,
+                                                "successor",
+                                                predecessor
+                                        };
+                                        publishProgress(forPublishProgress);
+
+                                        forPublishProgress = new String[]{
+                                                "adjustRing",
+                                                port,
+                                                "predecessor",
+                                                myPort
+                                        };
+                                        publishProgress(forPublishProgress);
+
+                                        successor = port;
+                                    } else {
+                                        String[] forPublishProgress = new String[]{
+                                                "adjustRing",
+                                                successor,
+                                                "successor",
+                                                port
+                                        };
+                                        publishProgress(forPublishProgress);
+
+                                        forPublishProgress = new String[]{
+                                                "adjustRing",
+                                                port,
+                                                "predecessor",
+                                                successor
+                                        };
+                                        publishProgress(forPublishProgress);
+
+                                        forPublishProgress = new String[]{
+                                                "adjustRing",
+                                                port,
+                                                "successor",
+                                                myPort
+                                        };
+                                        publishProgress(forPublishProgress);
+
+                                        predecessor = port;
+                                    }
+                                } else if (newNodeHash.compareTo(myPortHash) > 0) {
+                                    String[] forPublishProgress = new String[]{
+                                            "adjustRing",
+                                            port,
+                                            "predecessor",
+                                            myPort
+                                    };
+                                    publishProgress(forPublishProgress);
+
+                                    forPublishProgress = new String[]{
+                                            "adjustRing",
+                                            port,
+                                            "successor",
+                                            successor
+                                    };
+                                    publishProgress(forPublishProgress);
+
+                                    forPublishProgress = new String[]{
+                                            "adjustRing",
+                                            successor,
+                                            "predecessor",
+                                            port
+                                    };
+                                    publishProgress(forPublishProgress);
+
+                                    successor = port;
+                                }
+//                                msgPlusPortObject.predecessor = successor;
+//                                msgPlusPortObject.successor = myPort;
+//
+////                                Req to succ to adjust its succ to port
+////                                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "adjustRing", successor, "successor", port);
+//                                String[] forPublishProgress = new String[]{
+//                                    "adjustRing",
+//                                    successor,
+//                                    "successor",
+//                                    port
+//                                };
+//                                publishProgress(forPublishProgress);
+//
+//
+//                                predecessor = port;
                             }
                         } else if (successor != predecessor) {
                             Log.d(TAG, "herererererere: " + myPort);
