@@ -72,11 +72,11 @@ public class SimpleDhtProvider extends ContentProvider {
     public Uri insert(Uri uri, ContentValues values) {
         // TODO Auto-generated method stub
 
-        String originatorPort = myPort;
-        if (values.containsKey("originator")){
-            originatorPort = (String) values.get("originator");
-            values.remove("originator");
-        }
+//        String originatorPort = myPort;
+//        if (values.containsKey("originator")) {
+//            originatorPort = (String) values.get("originator");
+//            values.remove("originator");
+//        }
 
         String originalKey = (String) values.get("key");
         String hashedKey = null;
@@ -84,6 +84,14 @@ public class SimpleDhtProvider extends ContentProvider {
             hashedKey = genHash(originalKey);
         } catch (NoSuchAlgorithmException e) {
             Log.e(TAG, "CP insert " + e.toString());
+        }
+
+        try {
+            if (successor != null) {
+                successorHash = genHash(String.valueOf((Integer.parseInt(successor) / 2)));
+            }
+        } catch (NoSuchAlgorithmException e) {
+            Log.e(TAG, "successorHash " + e.toString());
         }
 
         try {
@@ -97,23 +105,35 @@ public class SimpleDhtProvider extends ContentProvider {
         Log.d(TAG,
                 "CP insert start myport" + myPort + " key " + originalKey +
                         " hashedKey " + hashedKey);
-        Log.d(TAG,
-                "CP insert myport " + myPort + " originatorPort " + originatorPort + " .equals " + Boolean.toString(myPort.equals(originatorPort)));
+//        Log.d(TAG,
+//                "CP insert myport " + myPort + " originatorPort " + originatorPort + " .equals " + Boolean.toString(myPort.equals(originatorPort)));
         if (successor == null) {
             Log.d(TAG, "CP insert succ NULL myport" + myPort + " key " + originalKey);
             db.insert(TABLE_NAME, null, values);
-        } else if (myPortHash.compareTo(hashedKey) >= 0 && hashedKey.compareTo(predecessorHash) > 0) {
+        } else if (successor == predecessor) {
+            if (hashedKey.compareTo(myPortHash) <= 0 && hashedKey.compareTo(successorHash) < 0) {
+                db.insert(TABLE_NAME, null, values);
+            } else if (hashedKey.compareTo(myPortHash) > 0 && hashedKey.compareTo(successorHash) < 0) {
+                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", successor, originalKey, (String) values.get("value"));
+            } else if (hashedKey.compareTo(myPortHash) > 0 && hashedKey.compareTo(successorHash) > 0) {
+                db.insert(TABLE_NAME, null, values);
+            }
+        } else if (myPortHash.compareTo(hashedKey) >=
+            0 && hashedKey.compareTo(predecessorHash) > 0) {
             Log.d(TAG, "CP insert NODE FOUND myport" + myPort + " key " + originalKey);
             db.insert(TABLE_NAME, null, values);
 //        } else if (myPort.equals(originatorPort) && (myPortHash.compareTo(hashedKey) < 0 && predecessorHash.compareTo(hashedKey) < 0) || (myPortHash.compareTo(hashedKey) > 0 && predecessorHash.compareTo(hashedKey) > 0)) {
-        } else if ((myPortHash.compareTo(hashedKey) < 0 && predecessorHash.compareTo(hashedKey) < 0) || (myPortHash.compareTo(hashedKey) > 0 && predecessorHash.compareTo(hashedKey) > 0)) {
+        } else if (myPortHash.compareTo(hashedKey) < 0 && predecessorHash.compareTo(hashedKey) < 0 && successorHash.compareTo(hashedKey) < 0 && myPortHash.compareTo(predecessorHash) < 0) {
             Log.d(TAG, "CP insert bw last node before 2^m -1 myport" + myPort + " key " + originalKey);
+// || (myPortHash.compareTo(hashedKey) < 0 && predecessorHash.compareTo(hashedKey) > 0)
+            db.insert(TABLE_NAME, null, values);
+//            if (myPort.equals(originatorPort)) {
+//                db.insert(TABLE_NAME, null, values);
+//            } else {
+//                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", successor, originalKey, (String) values.get("value"), originatorPort);
+//            }
 
-            if (myPort.equals(originatorPort)) {
-                db.insert(TABLE_NAME, null, values);
-            } else {
-                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", successor, originalKey, (String) values.get("value"), originatorPort);
-            }
+
 //        } else if (myPortHash.compareTo(hashedKey) > 0 && predecessorHash.compareTo(hashedKey) > 0){
 //            Log.d(TAG, "CP insert bw last node after 0 but before first node" + " myport" + myPort + " key " + originalKey);
 //
@@ -122,12 +142,15 @@ public class SimpleDhtProvider extends ContentProvider {
 //            } else {
 //                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", successor, originalKey, (String) values.get("value"), originatorPort);
 //            }
+        } else if (myPortHash.compareTo(hashedKey) > 0 && predecessorHash.compareTo(hashedKey) > 0 && successorHash.compareTo(hashedKey) > 0 && myPortHash.compareTo(predecessorHash) < 0) {
+            db.insert(TABLE_NAME, null, values);
         } else {
             Log.d(TAG,
                     "CP insert referred to succ " + successor + " myport" + myPort + " key " + originalKey);
-            new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR,
-                    "insert", successor, originalKey, (String) values.get(
-                            "value"), null);
+//            new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR,
+//                    "insert", successor, originalKey, (String) values.get(
+//                            "value"), null);
+            new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", successor, originalKey, (String) values.get("value"));
         }
         Log.d(TAG, "CP insert done myport" + myPort + " key " + originalKey);
 
@@ -446,7 +469,7 @@ public class SimpleDhtProvider extends ContentProvider {
             } else if (msgType.equals("insert")) {
                 String key = msgs[2];
                 String value = msgs[3];
-                String originatorPort = msgs[4];
+//                String originatorPort = msgs[4];
 
                 try {
                     Log.d(TAG, "ClientTask insert started from " + myPort + " for "+nxtSuccessor + " key " +key);
@@ -459,7 +482,8 @@ public class SimpleDhtProvider extends ContentProvider {
 
                     messageStruct msgStruct = new messageStruct(
                         msgType,
-                        originatorPort,
+//                        originatorPort,
+                            null,
                         key,
                         value
                     );
@@ -1028,55 +1052,15 @@ public class SimpleDhtProvider extends ContentProvider {
                         ContentValues values = new ContentValues();
                         values.put(SimpleDhtProvider.COLUMN_NAME_KEY, msgPlusPortObject.key);
                         values.put(SimpleDhtProvider.COLUMN_NAME_VALUE, msgPlusPortObject.value);
-                        if (msgPlusPortObject.originator != null) {
-                            values.put("originator", msgPlusPortObject.originator);
-                        }
+//                        if (msgPlusPortObject.originator != null) {
+//                            values.put("originator", msgPlusPortObject.originator);
+//                        }
 //                        Uri uri = getContentResolver().insert(SimpleDhtProvider.CONTENT_URI, values);
                         insert(CONTENT_URI, values);
                         Log.d(TAG, "ServerTask insert done from " + msgPlusPortObject.msg + " for " + myPort + " for key " + msgPlusPortObject.key);
                     } else if (msgPlusPortObject.msg.equals("search")) {
                         query(CONTENT_URI, null, msgPlusPortObject.key, null, null);
                     }
-
-
-//                    while(!serverq.isEmpty() && serverq.peek().deliverable == 1 && accepted_seq_no + 1 == serverq.peek().proposedSeqNo){
-//                        messageStruct m = serverq.poll();
-//
-//                        if(failed_port != -1 || failed_port != m.port) {
-//
-//                            Log.e(TAG, "Msg: " + m.msg + " : " + Double.parseDouble(Integer.toString(m.proposedSeqNo) + "." + Integer.toString(m.pid)));
-//                            String msgReceived = m.msg;
-//                            String showMsgReceived = "\t" + msgReceived;
-//                            Integer port = m.port;
-//
-//                            Integer msgReceivedfrompid = m.pid;
-//                            String[] forPublishProgress = new String[]{showMsgReceived, Integer.toString(port), Integer.toString(msgReceivedfrompid), Integer.toString(m.proposedSeqNo)};
-//
-//
-//                            publishProgress(forPublishProgress);
-//
-//
-//                            ContentValues values = new ContentValues();
-//                            values.put(GroupMessengerProvider.COLUMN_NAME_KEY, Integer.toString(seq_no));
-//                            values.put(GroupMessengerProvider.COLUMN_NAME_VALUE, m.msg);
-//                            Uri uri = getContentResolver().insert(GroupMessengerProvider.CONTENT_URI, values);
-//
-//                            accepted_seq_no = m.proposedSeqNo;
-//                            seq_no++;
-//                        }
-//                    }
-//
-//                    if (msgPlusPortObject.deliverable != 1) {
-//                        ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
-//
-//                        msgPlusPortObject.proposedSeqNo = Math.max(accepted_seq_no, proposedSeqNoPid) + 1;
-//                        msgPlusPortObject.pid = process_id;
-//
-//                        proposedSeqNoPid = msgPlusPortObject.proposedSeqNo;
-//                        out.writeObject(msgPlusPortObject);
-//                        out.flush();
-//                        out.close();
-//                    }
 
                     clientSocket.close();
                 } catch (Exception e){
