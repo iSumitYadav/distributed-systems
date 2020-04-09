@@ -208,7 +208,9 @@ public class SimpleDhtProvider extends ContentProvider {
         // TODO Auto-generated method stub
         Cursor cursor;
 
-        Log.d(TAG, "GLOBAL myPort: " + myPort + "," + " succ: "+ successor + ", " + "pred: "+predecessor);
+        Log.d(TAG,
+                "QUERY GLOBAL myPort: " + myPort + "," + " succ: "+ successor +
+                        ", " + "pred: "+predecessor);
 
         Log.d(TAG, selection);
         if (selection.equals("*") || selection.equals("@")) {
@@ -292,13 +294,14 @@ public class SimpleDhtProvider extends ContentProvider {
             String port = "";
             String msgType = msgs[0];
             String nxtSuccessor = msgs[1];
-
-            if (msgType.equals("connect") && !myPort.equals(CONNECT_PORT)) {
+            Log.d(TAG, "lololololog: "+myPort+" " +nxtSuccessor);
+//            if (msgType.equals("connect") && !myPort.equals(CONNECT_PORT)) {
+            if (msgType.equals("connect")) {
                 try {
                     String originatorPort = msgs[2];
                     Log.d(TAG,
                             "ClientTask connect started from " + msgs[2] + " " +
-                                    "for "+nxtSuccessor);
+                                    "for " + nxtSuccessor);
                     Socket socket =
                             new Socket(InetAddress.getByAddress(new byte[]{10
                                     , 0, 2, 2}), Integer.parseInt(nxtSuccessor));
@@ -309,8 +312,8 @@ public class SimpleDhtProvider extends ContentProvider {
 //                    String myPort = nxtSuccessor;
 
                     messageStruct msgStruct = new messageStruct(
-                        msgType,
-                        msgs[2]
+                            msgType,
+                            msgs[2]
                     );
 
                     ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
@@ -324,7 +327,7 @@ public class SimpleDhtProvider extends ContentProvider {
 
                     Log.d(TAG,
                             "ClientTask connect msg out from " + msgs[2] + " " +
-                                    "for "+nxtSuccessor);
+                                    "for " + nxtSuccessor);
 
                     ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
                     ack = (messageStruct) in.readObject();
@@ -332,12 +335,17 @@ public class SimpleDhtProvider extends ContentProvider {
 //                    if (ack.successor == null || ack.predecessor == null) {
 //
 //                    }
-                    successor = ack.successor;
-                    predecessor = ack.predecessor;
+
+                    if (ack.successor != null && ack.successor.length() > 0) {
+                        successor = ack.successor;
+                    }
+                    if (ack.predecessor != null && ack.predecessor.length() > 0) {
+                        predecessor = ack.predecessor;
+                    }
 
 //                    final String myPortFinal = myPort;
-                    Log.d(TAG, "ClientTask connect ack in from " + msgs[2] + " for "+nxtSuccessor);
-                    Log.d(TAG, "ClientTask connect myPort: " + msgs[2] + ", " + "succ: "+ successor + ", pred: "+predecessor);
+                    Log.d(TAG, "ClientTask connect ack in from " + msgs[2] + " for " + nxtSuccessor);
+                    Log.d(TAG, "ClientTask connect myPort: " + msgs[2] + ", " + "succ: " + successor + ", pred: " + predecessor);
 //                    tv.append("myPort: " + myPort + ", succ: "+ successor + ", pred: "+predecessor);
 //                    tv.post(new Runnable() {
 //                        public void run() {
@@ -355,9 +363,96 @@ public class SimpleDhtProvider extends ContentProvider {
                     in.close();
                     socket.close();
                     Log.d(TAG, "ClientTask connect done from " + msgs[2] + " " +
-                            "for "+nxtSuccessor);
+                            "for " + nxtSuccessor);
                 } catch (Exception e) {
                     Log.e(TAG, "Client connect ExceptionFinal: " + e.toString());
+//                    Log.e(TAG, "ClientPort 1 ExceptionFinal: " + port);
+//                    failed_port = Integer.parseInt(port);
+                    e.printStackTrace();
+//                    continue;
+                }
+            } else if (msgType.equals("connectTo")) {
+                try {
+                    String originatorPort = msgs[2];
+                    Log.d(TAG,
+                            "ClientTask connect started from " + msgs[2] + " " +
+                                    "for " + nxtSuccessor);
+                    Socket socket =
+                            new Socket(InetAddress.getByAddress(new byte[]{10
+                                    , 0, 2, 2}), Integer.parseInt(nxtSuccessor));
+
+
+                    messageStruct msgStruct = new messageStruct(
+                            msgType,
+                            msgs[2]
+                    );
+
+                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+                    out.writeObject(msgStruct);
+                    out.flush();
+
+//                    Log.d(TAG,
+//                            "ClientTask connect msg out from " + msgs[2] + " " +
+//                                    "for " + nxtSuccessor);
+
+
+
+//                    final String myPortFinal = myPort;
+//                    Log.d(TAG, "ClientTask connect ack in from " + msgs[2] + " for " + nxtSuccessor);
+//                    Log.d(TAG, "ClientTask connect myPort: " + msgs[2] + ", " + "succ: " + successor + ", pred: " + predecessor);
+
+//                    in.close();
+                    socket.close();
+//                    Log.d(TAG, "ClientTask connect done from " + msgs[2] + " " +
+//                            "for " + nxtSuccessor);
+                } catch (Exception e) {
+                    Log.e(TAG,
+                            "Client connectTo ExceptionFinal: " + e.toString());
+//                    Log.e(TAG, "ClientPort 1 ExceptionFinal: " + port);
+//                    failed_port = Integer.parseInt(port);
+                    e.printStackTrace();
+//                    continue;
+                }
+            }
+            else if (msgType.equals("adjustRing")) {
+//                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "adjustRing", successor, "predecessor", port);
+                try {
+                    String adjustPort = msgs[1];
+                    String adjustNode = msgs[2];
+                    String adjustNodeToPort = msgs[3];
+                    Log.d(TAG, "Adjust Ring called for " + adjustPort  + " to assign " + adjustNode + " to port " + adjustNodeToPort);
+                    Socket socket =new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(adjustPort));
+
+                    messageStruct msgStruct = new messageStruct(
+                        msgType,
+                        adjustNode,
+                        adjustNodeToPort
+                    );
+
+                    ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+
+                    out.writeObject(msgStruct);
+                    out.flush();
+
+//                    Log.d(TAG,
+//                            "ClientTask connect msg out from " + msgs[2] + " " +
+//                                    "for " + nxtSuccessor);
+
+//                    ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+//                    ack = (messageStruct) in.readObject();
+
+//                    Log.d(TAG, "AdjustRing ack in from " + msgs[2] + " for " + nxtSuccessor);
+//                    Log.d(TAG,
+//                            "Ring Adjusted myPort: " + myPort + ", " + "succ" +
+//                                    ": " + successor + ", pred: " + predecessor);
+
+//                    in.close();
+                    socket.close();
+//                    Log.d(TAG, "ClientTask connect done from " + msgs[2] + " " +
+//                            "for " + nxtSuccessor);
+                } catch (Exception e) {
+                    Log.e(TAG,
+                            "Adjust connect ExceptionFinal: " + e.toString());
 //                    Log.e(TAG, "ClientPort 1 ExceptionFinal: " + port);
 //                    failed_port = Integer.parseInt(port);
                     e.printStackTrace();
@@ -494,7 +589,7 @@ public class SimpleDhtProvider extends ContentProvider {
 
     private class ServerTask extends AsyncTask<ServerSocket, String, Void> {
 
-        @SuppressLint("WrongThread")
+//        @SuppressLint("WrongThread")
         @Override
         protected Void doInBackground(ServerSocket... sockets) {
             ServerSocket serverSocket = sockets[0];
@@ -560,7 +655,7 @@ public class SimpleDhtProvider extends ContentProvider {
                             predecessor = port;
                             successor = port;
 
-                            Log.d(TAG, " Succ is Null myPort: " + myPort + ", succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
+                            Log.d(TAG, " Succ is Null myPort: " + myPort + ", succ: " + successor + ", pred: " + predecessor + " reqFromPort " + port);
 
                             msgPlusPortObject.successor = CONNECT_PORT;
                             msgPlusPortObject.predecessor = CONNECT_PORT;
@@ -568,48 +663,233 @@ public class SimpleDhtProvider extends ContentProvider {
 //                            out.writeObject(msgPlusPortObject);
 //                            out.flush();
 //                            out.close();
-                        } else if (successorHash.compareTo(newNodeHash) >= 0 && myPortHash.compareTo(newNodeHash) < 0) {
-                            msgPlusPortObject.predecessor = myPort;
-                            msgPlusPortObject.successor = successor;
+                        } else if (successor == predecessor) {
+                            if (newNodeHash.compareTo(successorHash) > 0 && newNodeHash.compareTo(predecessorHash) > 0) {
+                                msgPlusPortObject.predecessor = myPort;
+                                msgPlusPortObject.successor = successor;
 
-                            successor = port;
+//                                Req to pred to adjust its pred to port
+//                                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "adjustRing", predecessor, "predecessor", port);
+                                String[] forPublishProgress = new String[]{
+                                    "adjustRing",
+                                    predecessor,
+                                    "predecessor",
+                                    port
+                                };
+                                publishProgress(forPublishProgress);
 
-                            Log.d(TAG, " Succ in bw myPort: " + myPort + ", " +
-                                    "succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
 
-//                            out.writeObject(msgPlusPortObject);
-//                            out.flush();
-//                            out.close();
-                        } else if (predecessorHash.compareTo(newNodeHash) < 0 && myPortHash.compareTo(newNodeHash) >= 0) {
-                            msgPlusPortObject.predecessor = predecessor;
-                            msgPlusPortObject.successor = myPort;
+                                successor = port;
+                            } else if (newNodeHash.compareTo(successorHash) < 0 && newNodeHash.compareTo(predecessorHash) < 0) {
+                                msgPlusPortObject.predecessor = successor;
+                                msgPlusPortObject.successor = myPort;
 
-                            predecessor = port;
+//                                Req to succ to adjust its succ to port
+//                                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "adjustRing", successor, "successor", port);
+                                String[] forPublishProgress = new String[]{
+                                    "adjustRing",
+                                    successor,
+                                    "successor",
+                                    port
+                                };
+                                publishProgress(forPublishProgress);
 
-                            Log.d(TAG, " pred in bw myPort: " + myPort + ", " +
-                                    "succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
 
-//                            out.writeObject(msgPlusPortObject);
-//                            out.flush();
-//                            out.close();
-                        } else if (!port.equals(CONNECT_PORT)) {
-                            Log.d(TAG,
-                                    " req to succ myPort: " + myPort + ", " + "succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
-                            new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "connect", successor, port);
-                            Log.d(TAG,
-                                    " req made to succ myPort: " + myPort +
-                                            ", " +
-                                            "succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
-//                            out.writeObject(msgPlusPortObject);
-//                            out.flush();
-//                            out.close();
+                                predecessor = port;
+                            }
+                        } else if (successor != predecessor) {
+                            Log.d(TAG, "herererererere: " + myPort);
+                            if (newNodeHash.compareTo(successorHash) > 0 && newNodeHash.compareTo(predecessorHash) > 0) {
+                                Log.d(TAG, "1234: " + myPort);
+                                if (myPortHash.compareTo(predecessorHash) > 0 && myPortHash.compareTo(successorHash) > 0) {
+                                    Log.d(TAG, "apapapapapapapa: " + myPort);
+//                                    msgPlusPortObject.predecessor = myPort;
+                                    String[] forPublishProgress = new String[]{
+                                            "adjustRing",
+                                            port,
+                                            "predecessor",
+                                            myPort
+                                    };
+                                    publishProgress(forPublishProgress);
+//                                    msgPlusPortObject.successor = successor;
+                                    forPublishProgress = new String[]{
+                                            "adjustRing",
+                                            port,
+                                            "successor",
+                                            successor
+                                    };
+                                    publishProgress(forPublishProgress);
+
+
+
+//                                    Req to succ to adjust its pred to port
+//                                    new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "adjustRing", successor, "predecessor", port);
+                                    forPublishProgress = new String[]{
+                                        "adjustRing",
+                                        successor,
+                                        "predecessor",
+                                        port
+                                    };
+                                    publishProgress(forPublishProgress);
+
+//I WAS HERE
+                                    successor = port;
+                                } else {
+                                    Log.d(TAG, "uuuuuuuuuuu: " + successor +
+                                            "    " + port);
+//                                    Req "connect" to succ for port
+//                                    new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "connect", successor, port);
+                                    String[] forPublishProgress = new String[]{
+//                                        "connectTo",
+                                        "connect",
+                                        successor,
+                                        port
+                                    };
+                                    publishProgress(forPublishProgress);
+
+                                }
+                            } else if (newNodeHash.compareTo(successorHash) < 0 && newNodeHash.compareTo(predecessorHash) < 0) {
+                                Log.d(TAG, "aaaaaaaaaaaa: " + myPort);
+                                if (myPortHash.compareTo(predecessorHash) < 0 && myPortHash.compareTo(successorHash) < 0) {
+                                    Log.d(TAG, "zmzmzmzmzmzmzmzmz: " + myPort);
+//                                    msgPlusPortObject.successor = myPort;
+                                    String[] forPublishProgress = new String[]{
+                                            "adjustRing",
+                                            port,
+                                            "successor",
+                                            myPort
+                                    };
+                                    publishProgress(forPublishProgress);
+//                                    msgPlusPortObject.predecessor = predecessor;
+                                    forPublishProgress = new String[]{
+                                            "adjustRing",
+                                            port,
+                                            "predecessor",
+                                            predecessor
+                                    };
+                                    publishProgress(forPublishProgress);
+
+//                                    Req to pred to adjust its succ to port
+//                                    new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "adjustRing", predecessor, "successor", port);
+                                    forPublishProgress = new String[]{
+                                        "adjustRing",
+                                        predecessor,
+                                        "successor",
+                                        port
+                                    };
+                                    publishProgress(forPublishProgress);
+
+                                    predecessor = port;
+                                } else {
+                                    Log.d(TAG, "iiiiiiii: " + predecessor +
+                                            "    " + port);
+//                                    Req "connect" to pred for port
+//                                    new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "connect", predecessor, port);
+                                    String[] forPublishProgress = new String[]{
+//                                        "connectTo",
+                                        "connect",
+                                        predecessor,
+                                        port
+                                    };
+                                    publishProgress(forPublishProgress);
+                                }
+                            } else if (newNodeHash.compareTo(myPortHash) > 0 && newNodeHash.compareTo(successorHash) < 0) {
+                                Log.d(TAG, "qqqqqqqqqqqqqqq: " + myPort);
+                                msgPlusPortObject.successor = successor;
+                                msgPlusPortObject.predecessor = myPort;
+
+//                                Req to succ to adjust its pred to port
+//                                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "adjustRing", successor, "predecessor", port);
+                                String[] forPublishProgress = new String[]{
+                                    "adjustRing",
+                                    successor,
+                                    "predecessor",
+                                    port
+                                };
+                                publishProgress(forPublishProgress);
+
+                                successor = port;
+                            } else if (newNodeHash.compareTo(myPortHash) < 0 && newNodeHash.compareTo(predecessorHash) > 0) {
+                                Log.d(TAG, "tttttttttttttt: " + myPort);
+                                msgPlusPortObject.successor = myPort;
+                                msgPlusPortObject.predecessor = predecessor;
+
+//                                Req to pred to adjust its succ to port
+//                                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "adjustRing", predecessor, "successor", port);
+                                String[] forPublishProgress = new String[]{
+                                    "adjustRing",
+                                    predecessor,
+                                    "successor",
+                                    port
+                                };
+                                publishProgress(forPublishProgress);
+
+                                predecessor = port;
+                            }
                         }
+//                        } else if (successorHash.compareTo(newNodeHash) >= 0 && myPortHash.compareTo(newNodeHash) < 0) {
+//                            msgPlusPortObject.predecessor = myPort;
+//                            msgPlusPortObject.successor = successor;
+//
+//                            successor = port;
+//
+//                            Log.d(TAG, " Succ in bw myPort: " + myPort + ", " +
+//                                    "succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
+//
+////                            out.writeObject(msgPlusPortObject);
+////                            out.flush();
+////                            out.close();
+//                        } else if (predecessorHash.compareTo(newNodeHash) < 0 && myPortHash.compareTo(newNodeHash) >= 0) {
+//                            msgPlusPortObject.predecessor = predecessor;
+//                            msgPlusPortObject.successor = myPort;
+//
+//                            predecessor = port;
+//
+//                            Log.d(TAG, " pred in bw myPort: " + myPort + ", " +
+//                                    "succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
+//
+////                            out.writeObject(msgPlusPortObject);
+////                            out.flush();
+////                            out.close();
+//                        } else if (!port.equals(CONNECT_PORT)) {
+//                            Log.d(TAG,
+//                                    " req to succ myPort: " + myPort + ", " + "succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
+//                            new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "connect", successor, port);
+//                            Log.d(TAG,
+//                                    " req made to succ myPort: " + myPort +
+//                                            ", " +
+//                                            "succ: "+ successor + ", pred: "+predecessor + " reqFromPort " + port);
+////                            out.writeObject(msgPlusPortObject);
+////                            out.flush();
+////                            out.close();
+//                        }
 //                        } else {
 ////                             Can't happen coz all join requests are handled by 5554 only
 //                        }
                         out.writeObject(msgPlusPortObject);
                         out.flush();
                         out.close();
+//                    } else if (msgPlusPortObject.msg.equals("connectTo")) {
+//                        successor = msgPlusPortObject.port;
+////                        predecessor = myPort;
+//                        Log.d(TAG, "connectTo: successor"+successor+" " +
+//                                "predecessor: "+predecessor);
+//                        String[] forPublishProgress = new String[]{
+//                                "connect",
+//                                myPort,
+//                                msgPlusPortObject.port
+//                        };
+//                        publishProgress(forPublishProgress);
+                    } else if (msgPlusPortObject.msg.equals("adjustRing")) {
+                        if (msgPlusPortObject.adjustNode.equals("successor")) {
+                            successor = msgPlusPortObject.adjustNodeToPort;
+                        } else if (msgPlusPortObject.adjustNode.equals("predecessor")) {
+                            predecessor = msgPlusPortObject.adjustNodeToPort;
+                        }
+
+//                        out.writeObject(msgPlusPortObject);
+//                        out.flush();
+//                        out.close();
                     } else if (msgPlusPortObject.msg.equals("insert")) {
                         Log.d(TAG,
                                 "ServerTask insert start from " + msgPlusPortObject.msg + " for " + myPort + " for key " + msgPlusPortObject.key);
@@ -675,41 +955,27 @@ public class SimpleDhtProvider extends ContentProvider {
             }
         }
 
-//        protected void onProgressUpdate(String... strings) {
-//            /*
-//             * The following code displays what is received in doInBackground().
-//             */
-//
-//            int fgColor = Color.YELLOW;
-//            String showMsgReceived = strings[0];
-//            Integer port = Integer.parseInt(strings[1]);
-//
-//            switch (port){
-//                case 11108:
-//                    fgColor = Color.RED;
-//                    break;
-//                case 11112:
-//                    fgColor = Color.GREEN;
-//                    break;
-//                case 11116:
-//                    fgColor = Color.BLUE;
-//                    break;
-//                case 11120:
-//                    fgColor = Color.LTGRAY;
-//                    break;
-//                case 11124:
-//                    fgColor = Color.BLACK;
-//                    break;
-//            }
-//
-//            Spannable colorMsg = new SpannableString(showMsgReceived);
-//            colorMsg.setSpan(new ForegroundColorSpan(fgColor), 0, showMsgReceived.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-//
-//            TextView tv = (TextView) findViewById(R.id.textView1);
-//            tv.append(colorMsg);
-//
-//            return;
-//        }
+        protected void onProgressUpdate(String... strings) {
+            /*
+             * The following code displays what is received in doInBackground().
+             */
+
+            if (strings[0].equals("adjustRing")) {
+                Log.d(TAG, "onProgressUpdate adjustRing");
+                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR,
+                        "adjustRing", strings[1], strings[2], strings[3]);
+//            } else if (strings[0].equals("connectTo")) {
+//                Log.d(TAG, "onProgressUpdate connectTo");
+//                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR,
+//                        "connectTo", strings[1], strings[2]);
+            } else if (strings[0].equals("connect")) {
+                Log.d(TAG, "onProgressUpdate connect");
+                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR,
+                        "connect", strings[1], strings[2]);
+            }
+
+            return;
+        }
     }
 
 //  ================================================================================
@@ -733,7 +999,9 @@ public class SimpleDhtProvider extends ContentProvider {
 
     public class SimpleDHTDBHelper extends SQLiteOpenHelper{
         public static final int DATABASE_VERSION = 1;
-        private final String SQL_CREATE_TABLE = "CREATE TABLE " + TABLE_NAME + " (" + COLUMN_NAME_KEY + " TEXT," + COLUMN_NAME_VALUE + " TEXT)";
+        private final String SQL_CREATE_TABLE =
+                "CREATE TABLE " + TABLE_NAME + " (" + COLUMN_NAME_KEY + " " +
+                        "TEXT," + COLUMN_NAME_VALUE + " TEXT)";
 
 
         public SimpleDHTDBHelper(Context context) {
@@ -755,7 +1023,7 @@ public class SimpleDhtProvider extends ContentProvider {
 }
 
 class messageStruct implements Serializable {
-    String msg, port, key, value, successor, predecessor, originator;
+    String msg, port, key, value, successor, predecessor, originator, adjustNode, adjustNodeToPort;
 
     public messageStruct(){
         msg = "";
@@ -776,5 +1044,11 @@ class messageStruct implements Serializable {
         originator = _originator;
         key = _key;
         value = _value;
+    }
+
+    public messageStruct(String message, String _adjustNode, String _adjustNodeToPort){
+        msg = message;
+        adjustNode = _adjustNode;
+        adjustNodeToPort = _adjustNodeToPort;
     }
 }
