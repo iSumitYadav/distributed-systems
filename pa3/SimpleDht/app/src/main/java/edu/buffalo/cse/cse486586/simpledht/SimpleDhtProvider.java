@@ -101,10 +101,20 @@ public class SimpleDhtProvider extends ContentProvider {
             db.insert(TABLE_NAME, null, values);
         } else if (successor == predecessor) {
             if (hashedKey.compareTo(myPortHash) <= 0 && hashedKey.compareTo(successorHash) < 0) {
-                db.insert(TABLE_NAME, null, values);
+                if (successorHash.compareTo(myPortHash) < 0) {
+                    new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", successor, originalKey, (String) values.get("value"));
+                } else {
+                    db.insert(TABLE_NAME, null, values);
+                }
             } else if (hashedKey.compareTo(myPortHash) > 0 && hashedKey.compareTo(successorHash) < 0) {
                 new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", successor, originalKey, (String) values.get("value"));
             } else if (hashedKey.compareTo(myPortHash) > 0 && hashedKey.compareTo(successorHash) > 0) {
+                if (successorHash.compareTo(myPortHash) < 0) {
+                    new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", successor, originalKey, (String) values.get("value"));
+                } else {
+                    db.insert(TABLE_NAME, null, values);
+                }
+            } else if (hashedKey.compareTo(myPortHash) < 0 && hashedKey.compareTo(successorHash) > 0) {
                 db.insert(TABLE_NAME, null, values);
             }
         } else if (myPortHash.compareTo(hashedKey) >=
@@ -199,7 +209,7 @@ public class SimpleDhtProvider extends ContentProvider {
             Log.d("qKEY", selection);
 
             return cursor;
-        } else if (selection.equals("*")) {
+        } else if (selection.equals("*") || selection.equals("GDump")) {
             Log.d(TAG, "in * query myPort: " + myPort);
 //            String[] selectionArgss = new String[]{selection};
 //
@@ -215,6 +225,10 @@ public class SimpleDhtProvider extends ContentProvider {
                 sortOrder,
                 null
             );
+
+            if (selection.equals("GDump")) {
+                return cursor;
+            }
 
             if (successor != null && !successor.equals(originatorPort)) {
                 Log.d(TAG, "in query while loop for " + myPort + " to succ "+ successor);
