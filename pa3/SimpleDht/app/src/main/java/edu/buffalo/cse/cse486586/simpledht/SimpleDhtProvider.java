@@ -12,8 +12,14 @@ import java.io.ObjectOutputStream;
 import java.util.Formatter;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.HashMap;
+import java.util.Map;
+//import java.util.Map.Entry;
+import java.util.concurrent.ExecutionException;
 
 
+import android.database.MatrixCursor;
+import android.database.MergeCursor;
 import android.net.Uri;
 import android.util.Log;
 import android.os.AsyncTask;
@@ -24,6 +30,7 @@ import android.content.ContentValues;
 import android.content.ContentProvider;
 
 import android.database.Cursor;
+import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
@@ -43,6 +50,7 @@ public class SimpleDhtProvider extends ContentProvider {
     String myPort = null;
     String portStr = null;
     String myPortHash = null;
+//    String originatorPort = null;
 
     String successor = null;
     String predecessor = null;
@@ -162,12 +170,22 @@ public class SimpleDhtProvider extends ContentProvider {
         // TODO Auto-generated method stub
         Cursor cursor;
 
+        String originatorPort = myPort;
+        if (selectionArgs!= null && selectionArgs.length >= 1 && selectionArgs[0] != null) {
+            originatorPort = selectionArgs[0];
+        }
+
+//        boolean searchRing = false;
+//        if (selectionArgs!= null && selectionArgs.length >= 2 && selectionArgs[1] != null) {
+//            searchRing = true;
+//        }
+
         Log.d(TAG,
                 "QUERY GLOBAL myPort: " + myPort + "," + " succ: "+ successor +
                         ", " + "pred: "+predecessor);
 
         Log.d(TAG, selection);
-        if (selection.equals("*") || selection.equals("@")) {
+        if (selection.equals("@")) {
             cursor = db.query(
                 TABLE_NAME,
                 projection,
@@ -181,63 +199,173 @@ public class SimpleDhtProvider extends ContentProvider {
             Log.d("qKEY", selection);
 
             return cursor;
+        } else if (selection.equals("*")) {
+            Log.d(TAG, "in * query myPort: " + myPort);
+//            String[] selectionArgss = new String[]{selection};
+//
+//            selection = COLUMN_NAME_KEY + "=?";
+
+            cursor = db.query(
+                TABLE_NAME,
+                projection,
+                null,
+                null,
+                null,
+                null,
+                sortOrder,
+                null
+            );
+
+            if (successor != null && !successor.equals(originatorPort)) {
+                Log.d(TAG, "in query while loop for " + myPort + " to succ "+ successor);
+                Cursor successorCursor = actSynchronously("search", successor, "*", originatorPort);
+
+                cursor = new MergeCursor(new Cursor[]{cursor, successorCursor});
+            }
+//            return cursor;
         } else {
-            String hashKey = null;
+            String[] selectionArgss = new String[]{selection};
+
+            selection = COLUMN_NAME_KEY + "=?";
+
+            cursor = db.query(
+                TABLE_NAME,
+                projection,
+                selection,
+                selectionArgss,
+                null,
+                null,
+                sortOrder,
+                "1"
+            );
+
+            Log.d("qKEY", selectionArgss[0]);
             try {
-                hashKey = genHash(selection);
-            } catch (NoSuchAlgorithmException e) {
-                Log.e(TAG, "CP query " + e.toString());
-            }
-
-            try {
-                if (predecessor != null) {
-                    predecessorHash = genHash(String.valueOf((Integer.parseInt(predecessor) / 2)));
-                }
-            } catch (NoSuchAlgorithmException e) {
-                Log.e(TAG, "predecessorHash " + e.toString());
-            }
-
-            if (predecessor == null || (myPortHash.compareTo(hashKey) >= 0 && hashKey.compareTo(predecessorHash) > 0)) {
-                String[] selectionArgss = new String[]{selection};
-
-                selection = COLUMN_NAME_KEY + "=?";
-
-                cursor = db.query(
-                    TABLE_NAME,
-                    projection,
-                    selection,
-                    selectionArgss,
-                    null,
-                    null,
-                    sortOrder,
-                    "1"
-                );
-
-                Log.d("qKEY", selectionArgss[0].toString());
-                try {
-                    if (cursor == null) {
-                        Log.d("cursor is Null", "-");
-                    } else {
-                        Log.d("cursor is NOT Null", "-");
-                    }
-//                    Log.d("cursor is Null", DatabaseUtils.dumpCursorToString(cursor));
+                if (cursor.getCount() <= 0) {
+                    Log.d("cursor is Null", "-");
+                } else {
+                    Log.d("cursor is NOT Null", "-");
+                    // Log.d("cursor is Null", DatabaseUtils.dumpCursorToString(cursor));
                     cursor.moveToFirst();
                     Log.d("qKEY cursor", cursor.getString(0));
                     Log.d("qVALUE cursor", cursor.getString(1));
+                }
+            } catch (Exception e) {
+                Log.e(TAG, e.toString());
+                e.printStackTrace();
+            }
+
+//            if (cursor.getCount() <= 0 && myPort.equals(originatorPort)) {
+            if (cursor.getCount() <= 0) {
+                try {
+                    Log.d(TAG, "query ASYNC START");
+//                    new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR,
+//                            "search", successor, selectionArgss[0],
+//                            originatorPort).get();
+
+                    cursor = actSynchronously("search", successor, selectionArgss[0], originatorPort);
+
+                    Log.d(TAG, "query ASYNC STOP");
                 } catch (Exception e) {
-                    Log.e(TAG, e.toString());
+                    Log.e(TAG, "first call to actSynchronously: " + myPort);
                     e.printStackTrace();
                 }
-
-                return cursor;
-            } else {
-                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "search", successor, selection);
+//            } else {
+//                return cursor;
             }
+        }
+
+        return cursor;
+//        return null;
+    }
+
+
+    public Cursor actSynchronously(String msgType, String portToConnect, String key, String originatorPort) {
+        try {
+            Log.d(TAG, "actSynchronously Start for " + portToConnect);
+            Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(portToConnect));
+            messageStruct msgStruct = new messageStruct(
+                msgType,
+                originatorPort,
+                key,
+                null,
+                null
+            );
+
+            ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+            out.writeObject(msgStruct);
+            out.flush();
+
+
+            Log.d(TAG, "actSynchronously waiting for ack");
+            messageStruct ack = new messageStruct();
+            ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+            ack = (messageStruct) in.readObject();
+
+            Log.d(TAG, "actSynchronously ack rcvd");
+
+            MatrixCursor matrixCursor;
+            matrixCursor = new MatrixCursor(new String[]{COLUMN_NAME_KEY, COLUMN_NAME_VALUE});
+
+            if (!key.equals("*")) {
+                MatrixCursor.RowBuilder newRow = matrixCursor.newRow();
+                if (!ack.value.equals(null)) {
+                    newRow.add(ack.key);
+                    newRow.add(ack.value);
+
+                    return matrixCursor;
+                }
+            } else {
+                Log.d(TAG, "actSynchronously after ack rcvd in * else");
+
+//                Map<String, String> cursorKeyValueMap = (HashMap<String, String>) ack.keyValueMap;
+                Map<String, String> cursorKeyValueMap = ack.keyValueMap;
+
+                if (cursorKeyValueMap != null && !cursorKeyValueMap.isEmpty()) {
+                    Log.d(TAG, "actSynchronously after ack rcvd in * else b4 " +
+                            "for loop pack in matrixcursor");
+                    for (Map.Entry<String, String> entry : cursorKeyValueMap.entrySet()) {
+                        MatrixCursor.RowBuilder newRow = matrixCursor.newRow();
+                        Log.d(TAG, "key: "+entry.getKey());
+                        Log.d(TAG, "value: "+entry.getValue());
+                        newRow.add(entry.getKey());
+                        newRow.add(entry.getValue());
+                    }
+                }
+
+                Log.d(TAG, "actSynchronously after ack rcvd in * else before " +
+                        "return");
+                return matrixCursor;
+            }
+
+            in.close();
+            socket.close();
+        } catch (Exception e) {
+            Log.e(TAG, "query Client search ExceptionFinal: " + e.toString());
+            e.printStackTrace();
         }
 
         return null;
     }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // TRY CURSOR AS 2ND PARAM FOR ONPROGRESSUPDATE
     private class ClientTask extends AsyncTask<String, Void, Void> {
 
         @Override
@@ -347,13 +475,17 @@ public class SimpleDhtProvider extends ContentProvider {
                 }
             } else if (msgType.equals("search")) {
                 String key = msgs[2];
+                String originatorPort = msgs[3];
 
                 try {
+
                     Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
 
                     messageStruct msgStruct = new messageStruct(
                         msgType,
-                        key
+                        originatorPort,
+                        key,
+                        null
                     );
 
                     ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
@@ -362,10 +494,14 @@ public class SimpleDhtProvider extends ContentProvider {
                     out.flush();
 
 
-                    ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-                    ack = (messageStruct) in.readObject();
+//                    ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+//                    ack = (messageStruct) in.readObject();
 
-                    in.close();
+//                    if (ack.value.equals("KEY_NOT_FOUND")) {
+//
+//                    }
+
+//                    in.close();
                     socket.close();
                 } catch (Exception e) {
                     Log.e(TAG, "Client search ExceptionFinal: " + e.toString());
@@ -387,9 +523,7 @@ public class SimpleDhtProvider extends ContentProvider {
             messageStruct msgPlusPortObject = new messageStruct();
 
             while(true){
-                Log.d(TAG,
-                        "GLOBAL myPort: " + myPort + "," +
-                                " succ: "+ successor + ", pred: "+predecessor);
+                Log.d(TAG, "GLOBAL myPort: " + myPort + "," + " succ: "+ successor + ", pred: "+predecessor);
                 try {
                     Socket clientSocket = null;
                     clientSocket = serverSocket.accept();
@@ -717,11 +851,166 @@ public class SimpleDhtProvider extends ContentProvider {
 
                         insert(CONTENT_URI, values);
                     } else if (msgPlusPortObject.msg.equals("search")) {
-                        query(CONTENT_URI, null, msgPlusPortObject.key, null, null);
+                        Log.d(TAG, "Server search key: " + msgPlusPortObject.key);
+
+
+                        Cursor cursor = null;
+                        boolean asyncReq = false;
+                        String hashKey = null;
+                        String[] forPublishProgress;
+
+//                        if (!msgPlusPortObject.key.equals("*")) {
+//                            try {
+//                                hashKey = genHash(msgPlusPortObject.key);
+//                            } catch (NoSuchAlgorithmException e) {
+//                                Log.e(TAG, "CP query " + e.toString());
+//                            }
+//                        }
+
+//                        try {
+//                            if (successor != null) {
+//                                successorHash = genHash(String.valueOf((Integer.parseInt(successor) / 2)));
+//                            }
+//                        } catch (NoSuchAlgorithmException e) {
+//                            Log.e(TAG, "successorHash " + e.toString());
+//                        }
+//
+//                        try {
+//                            if (predecessor != null) {
+//                                predecessorHash = genHash(String.valueOf((Integer.parseInt(predecessor) / 2)));
+//                            }
+//                        } catch (NoSuchAlgorithmException e) {
+//                            Log.e(TAG, "predecessorHash " + e.toString());
+//                        }
+
+                        if (!msgPlusPortObject.key.equals("*")) {
+                            try {
+                                hashKey = genHash(msgPlusPortObject.key);
+                            } catch (NoSuchAlgorithmException e) {
+                                Log.e(TAG, "CP query " + e.toString());
+                            }
+                            if (predecessor == null || (myPortHash.compareTo(hashKey) >= 0 && hashKey.compareTo(predecessorHash) > 0)) {
+                                cursor = query(CONTENT_URI, null,
+                                        msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
+                            } else if (predecessor == successor) {
+                                if (hashKey.compareTo(myPortHash) <= 0 && hashKey.compareTo(successorHash) < 0) {
+                                    cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
+                                } else if (hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) < 0) {
+//                                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "search", successor, msgPlusPortObject.key, msgPlusPortObject.originatorPort);
+//                                asyncReq = true;
+//                                forPublishProgress = new String[]{
+//                                    "search",
+//                                    successor,
+//                                    msgPlusPortObject.key,
+//                                    msgPlusPortObject.originatorPort
+//                                };
+//                                publishProgress(forPublishProgress);
+                                    cursor = actSynchronously("search", successor, msgPlusPortObject.key, msgPlusPortObject.originatorPort);
+                                } else if (hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) > 0) {
+                                    cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
+                                }
+                            } else if (myPortHash.compareTo(hashKey) >= 0 && hashKey.compareTo(predecessorHash) > 0) {
+                                cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
+                            } else if (myPortHash.compareTo(hashKey) < 0 && predecessorHash.compareTo(hashKey) < 0 && successorHash.compareTo(hashKey) < 0 && myPortHash.compareTo(predecessorHash) < 0) {
+                                cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
+                            } else if (myPortHash.compareTo(hashKey) > 0 && predecessorHash.compareTo(hashKey) > 0 && successorHash.compareTo(hashKey) > 0 && myPortHash.compareTo(predecessorHash) < 0) {
+                                cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
+                            } else {
+//                            new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "search", successor, msgPlusPortObject.key, msgPlusPortObject.originatorPort);
+//                            asyncReq = true;
+//                            forPublishProgress = new String[]{
+//                                "search",
+//                                successor,
+//                                msgPlusPortObject.key,
+//                                msgPlusPortObject.originatorPort
+//                            };
+//                            publishProgress(forPublishProgress);
+                                cursor = actSynchronously("search", successor, msgPlusPortObject.key, msgPlusPortObject.originatorPort);
+                            }
+                            if (cursor.getCount() > 0) {
+                                // CHECK IF THIS WORKS GOOD FOR * AND @
+                                cursor.moveToFirst();
+                                msgPlusPortObject.value = cursor.getString(1);
+                            }
+                        } else {
+//                            cursor = actSynchronously("search", successor, msgPlusPortObject.key, msgPlusPortObject.originatorPort);
+                            Log.d(TAG, "before query here on server serach for *");
+                            cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
+                            Log.d(TAG, "after query here on server serach for" +
+                                    " *");
+                            if (cursor.getCount() > 0) {
+                                Log.d(TAG, "after query here on server serach for * cursor have data");
+                                // CHECK IF THIS WORKS GOOD FOR * AND @
+                                cursor.moveToFirst();
+
+//                                ArrayList<String> cursorArrayList = new ArrayList<String>();
+//                                for(cursor.moveToFirst(); !cursor.isAfterLast(); cursor.moveToNext()) {
+//                                    cursorArrayList.add(cursor.getString(0));
+//                                }
+                                Map<String, String> cursorKeyValueMap = new HashMap<String, String>();
+                                while(!cursor.isAfterLast()) {
+                                    cursorKeyValueMap.put(cursor.getString(0), cursor.getString(1));
+                                    cursor.moveToNext();
+                                }
+                                Log.d(TAG, "after query here on server serach" +
+                                        " for * cursor have data packed in " +
+                                        "map");
+                                msgPlusPortObject.keyValueMap = cursorKeyValueMap;
+                            }
+                        }
+
+//                        if (!asyncReq) {
+//                            Log.d(TAG, "not async req");
+//                            if (cursor.getCount() <= 0){
+//                                Log.d(TAG, "cursor is null");
+//                            } else {
+//                                cursor.moveToFirst();
+//                                forPublishProgress = new String[]{
+//                                    "searchResult",
+//                                    msgPlusPortObject.originatorPort,
+//                                    cursor.getString(0),
+//                                    cursor.getString(1),
+//                                };
+//                                publishProgress(forPublishProgress);
+//                            }
+//                        }
+
+//                        if (cursor.getCount() <= 0){
+//                            Log.d(TAG, "cursor is null");
+//                        } else {
+//                            cursor = actSynchronously("search", successor, msgPlusPortObject.key, msgPlusPortObject.originatorPort);
+//                        }
+
+//                        if (cursor != null) {
+//                            cursor.moveToFirst();
+//
+//                            msgPlusPortObject.key = cursor.getString(0);
+//                            msgPlusPortObject.value = cursor.getString(1);
+//                        } else {
+////                            msgPlusPortObject.value = "KEY_NOT_FOUND";
+//                            String[] forPublishProgress = new String[]{
+//                                "searchResult",
+//                                msgPlusPortObject.originatorPort,
+//                                cursor.getString(0),
+//                                cursor.getString(1)
+//                            };
+//                            publishProgress(forPublishProgress);
+//                        }
+
+
+
+
+                        ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
+                        out.writeObject(msgPlusPortObject);
+                        out.flush();
+                        out.close();
+                    } else if (msgPlusPortObject.msg.equals("searchResult")) {
+
                     }
 
                     clientSocket.close();
                 } catch (Exception e){
+                    Log.d(TAG, "Server search Error: " + e.toString());
                     e.printStackTrace();
                 }
             }
@@ -740,6 +1029,9 @@ public class SimpleDhtProvider extends ContentProvider {
                 Log.d(TAG, "onProgressUpdate connect");
                 new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR,
                         "connect", strings[1], strings[2]);
+            } else if (strings[0].equals("search")) {
+                Log.d(TAG, "onProgressUpdate search");
+                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "search", strings[1], strings[2], strings[3]);
             }
 
             return;
@@ -791,7 +1083,8 @@ public class SimpleDhtProvider extends ContentProvider {
 }
 
 class messageStruct implements Serializable {
-    String msg, port, key, value, successor, predecessor, originator, adjustNode, adjustNodeToPort;
+    String msg, port, key, value, successor, predecessor, originatorPort, adjustNode, adjustNodeToPort;
+    Map<String, String> keyValueMap;
 
     public messageStruct(){
         msg = "";
@@ -807,16 +1100,25 @@ class messageStruct implements Serializable {
         predecessor = null;
     }
 
-    public messageStruct(String message, String _originator, String _key, String _value){
-        msg = message;
-        originator = _originator;
-        key = _key;
-        value = _value;
-    }
-
     public messageStruct(String message, String _adjustNode, String _adjustNodeToPort){
         msg = message;
         adjustNode = _adjustNode;
         adjustNodeToPort = _adjustNodeToPort;
+    }
+
+    public messageStruct(String message, String _originatorPort, String _key, String _value){
+        msg = message;
+        originatorPort = _originatorPort;
+        key = _key;
+        value = _value;
+    }
+
+    public messageStruct(String message, String _originatorPort, String _key,
+                         String _value, Map<String, String> _keyValueMap){
+        msg = message;
+        key = _key;
+        value = _value;
+        keyValueMap = _keyValueMap;
+        originatorPort = _originatorPort;
     }
 }
