@@ -61,6 +61,69 @@ public class SimpleDhtProvider extends ContentProvider {
     @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
         // TODO Auto-generated method stub
+        int rowsDeleted = 0;
+        Log.d(TAG, "delete " + selection);
+        String[] selectionArgss = new String[]{selection};
+
+        selection = COLUMN_NAME_KEY + "=?";
+        db.delete(TABLE_NAME, selection, selectionArgss);
+//        Log.d(TAG, "delete " + selection + " args: " + selectionArgs[0]);
+/*
+        String originalKey = (String) values.get("key");
+        String hashedKey = null;
+        try {
+            hashedKey = genHash(originalKey);
+        } catch (NoSuchAlgorithmException e) {
+            Log.e(TAG, "CP delete " + e.toString());
+        }
+
+        try {
+            if (successor != null) {
+                successorHash = genHash(String.valueOf((Integer.parseInt(successor) / 2)));
+            }
+        } catch (NoSuchAlgorithmException e) {
+            Log.e(TAG, "successorHash " + e.toString());
+        }
+
+        try {
+            if (predecessor != null) {
+                predecessorHash = genHash(String.valueOf((Integer.parseInt(predecessor) / 2)));
+            }
+        } catch (NoSuchAlgorithmException e) {
+            Log.e(TAG, "predecessorHash " + e.toString());
+        }
+
+        if (successor == null) {
+            db.delete(TABLE_NAME, selection, selectionArgs);
+        } else if (successor == predecessor) {
+            if (hashedKey.compareTo(myPortHash) <= 0 && hashedKey.compareTo(successorHash) < 0) {
+                if (successorHash.compareTo(myPortHash) < 0) {
+                    new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "delete", successor, originalKey, (String) values.get("value"));
+                } else {
+                    db.insert(TABLE_NAME, selection, selectionArgs);
+                }
+            } else if (hashedKey.compareTo(myPortHash) > 0 && hashedKey.compareTo(successorHash) < 0) {
+                new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", successor, originalKey, (String) values.get("value"));
+            } else if (hashedKey.compareTo(myPortHash) > 0 && hashedKey.compareTo(successorHash) > 0) {
+                if (successorHash.compareTo(myPortHash) < 0) {
+                    new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", successor, originalKey, (String) values.get("value"));
+                } else {
+                    db.insert(TABLE_NAME, selection, selectionArgs);
+                }
+            } else if (hashedKey.compareTo(myPortHash) < 0 && hashedKey.compareTo(successorHash) > 0) {
+                db.insert(TABLE_NAME, selection, selectionArgs);
+            }
+        } else if (myPortHash.compareTo(hashedKey) >=
+                0 && hashedKey.compareTo(predecessorHash) > 0) {
+            db.insert(TABLE_NAME, selection, selectionArgs);
+        } else if (myPortHash.compareTo(hashedKey) < 0 && predecessorHash.compareTo(hashedKey) < 0 && successorHash.compareTo(hashedKey) < 0 && myPortHash.compareTo(predecessorHash) < 0) {
+            db.insert(TABLE_NAME, selection, selectionArgs);
+        } else if (myPortHash.compareTo(hashedKey) > 0 && predecessorHash.compareTo(hashedKey) > 0 && successorHash.compareTo(hashedKey) > 0 && myPortHash.compareTo(predecessorHash) < 0) {
+            db.insert(TABLE_NAME, selection, selectionArgs);
+        } else {
+            new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", successor, originalKey, (String) values.get("value"));
+        }
+*/
         return 0;
     }
 
