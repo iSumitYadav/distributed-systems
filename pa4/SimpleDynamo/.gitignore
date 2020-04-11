@@ -11,3 +11,10 @@
 /build
 /captures
 .externalNativeBuild
+/app/build/
+.idea/codeStyles/Project.xml
+.idea/gradle.xml
+.idea/misc.xml
+../.DS_Store
+../pa1/.DS_Store
+/.idea/vcs.xml
