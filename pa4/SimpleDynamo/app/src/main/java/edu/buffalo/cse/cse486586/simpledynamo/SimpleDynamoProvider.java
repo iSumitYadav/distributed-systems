@@ -212,7 +212,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 	@Override
 	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
 		// TODO Auto-generated method stub
-		Cursor cursor;
+		Cursor cursor = null;
 
 		String originatorPort = myPort;
 		if (selectionArgs!= null && selectionArgs.length >= 1 && selectionArgs[0] != null) {
@@ -233,8 +233,6 @@ public class SimpleDynamoProvider extends ContentProvider {
 				null
 			);
 			Log.d("qKEY", selection);
-
-			return cursor;
 		} else if (selection.equals("*") || selection.equals("GDump")) {
 			Log.d(TAG, "in * query myPort: " + myPort);
 
@@ -260,37 +258,53 @@ public class SimpleDynamoProvider extends ContentProvider {
 				cursor = new MergeCursor(new Cursor[]{cursor, successorCursor});
 			}
 		} else {
-			String[] selectionArgss = new String[]{selection};
-
-			selection = COLUMN_NAME_KEY + "=?";
-
-			cursor = db.query(
-				TABLE_NAME,
-				projection,
-				selection,
-				selectionArgss,
-				null,
-				null,
-				sortOrder,
-				"1"
-			);
-
-			Log.d("qKEY", selectionArgss[0]);
+			String hashedKey = null;
 			try {
-				if (cursor.getCount() > 0) {
-					// Log.d("cursor is NOT Null", DatabaseUtils.dumpCursorToString(cursor));
-					cursor.moveToFirst();
-					Log.d("qKEY cursor", cursor.getString(0));
-					Log.d("qVALUE cursor", cursor.getString(1));
-				}
-			} catch (Exception e) {
-				Log.e(TAG, e.toString());
-				e.printStackTrace();
+				hashedKey = genHash(selection);
+			} catch (NoSuchAlgorithmException e) {
+				Log.e(TAG, "CP insert hashedKey " + e.toString());
 			}
 
-			if (cursor.getCount() <= 0) {
+			String[] selectionArgss = new String[]{selection};
+			String portToStoreKey = getNodeToStoreKey(hashedKey);
+
+			Log.d(TAG, "QUERYING " + myPort + " " + selection);
+
+			if (myPort.equals(portToStoreKey)) {
+				Log.d(TAG, "QUERYING myPort.equals(portToStoreKey) " + myPort +
+						" " + selection);
+
+				selection = COLUMN_NAME_KEY + "=?";
+
+				cursor = db.query(
+						TABLE_NAME,
+						projection,
+						selection,
+						selectionArgss,
+						null,
+						null,
+						sortOrder,
+						"1"
+				);
+
+				Log.d("qKEY", selectionArgss[0]);
 				try {
-					cursor = actSynchronously("search", successor, selectionArgss[0], originatorPort);
+					if (cursor.getCount() > 0) {
+						// Log.d("cursor is NOT Null", DatabaseUtils.dumpCursorToString(cursor));
+						cursor.moveToFirst();
+						Log.d("qKEY cursor", cursor.getString(0));
+						Log.d("qVALUE cursor", cursor.getString(1));
+					}
+				} catch (Exception e) {
+					Log.e(TAG, e.toString());
+					e.printStackTrace();
+				}
+
+			} else {
+				Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey +
+						" " + selection);
+				try {
+					cursor = actSynchronously("search", portToStoreKey, selectionArgss[0], originatorPort);
 				} catch (Exception e) {
 					Log.e(TAG, "first call to actSynchronously: " + myPort);
 					e.printStackTrace();
