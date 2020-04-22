@@ -287,8 +287,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 					if (cursor.getCount() > 0) {
 						// Log.d("cursor is NOT Null", DatabaseUtils.dumpCursorToString(cursor));
 						cursor.moveToFirst();
-						Log.d("qKEY cursor", cursor.getString(0));
-						Log.d("qVALUE cursor", cursor.getString(1));
+//						Log.d("qKEY cursor", cursor.getString(0));
+//						Log.d("qVALUE cursor", cursor.getString(1));
 					}
 				} catch (Exception e) {
 					Log.e(TAG, e.toString());
