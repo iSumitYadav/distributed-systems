@@ -7,6 +7,7 @@ import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -100,7 +101,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 			for (int i=0; i<2; i++) {
 				port = successorMap.get(port);
 
-				new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "replication", port, originalKey, (String) values.get("value"));
+				new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "replication", port, originalKey, (String) values.get("value"), myPort);
 			}
 
 		} else {
@@ -170,6 +171,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 			portStr = tel.getLine1Number().substring(tel.getLine1Number().length() - 4);
 			myPort = String.valueOf((Integer.parseInt(portStr) * 2));
 
+			Log.d(TAG, "CP onCreate: " + myPort);
 			try {
 				ServerSocket serverSocket = new ServerSocket(SERVER_PORT);
 				new ServerTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, serverSocket);
@@ -195,6 +197,32 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 			db = DBHelper.getWritableDatabase();
 			if (db != null) {
+
+				String port = myPort;
+				for (int i=0; i<2; i++) {
+					port = predecessorMap.get(port);
+
+					new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "replicate", port, myPort);
+
+//					Cursor cursor = actSynchronously("replicate", port,	"*", null);
+//					if (cursor.getCount() > 0) {
+//						ContentValues values = new ContentValues();
+//
+//						values.put(SimpleDynamoProvider.COLUMN_NAME_KEY, cursor.getString(0));
+//						values.put(SimpleDynamoProvider.COLUMN_NAME_VALUE, cursor.getString(1));
+//
+//						values.put("type", "replication");
+//						insertReplication(CONTENT_URI, values);
+//					}
+				}
+
+				port = myPort;
+				for (int i=0; i<2; i++) {
+					port = successorMap.get(port);
+
+					new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "getMissedInsert", port, myPort);
+				}
+
 				return true;
 			}
 
@@ -215,6 +243,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 			originatorPort = selectionArgs[0];
 		}
 
+		projection = new String[]{COLUMN_NAME_KEY, COLUMN_NAME_VALUE};
+
 //		Log.d(TAG, "QUERY GLOBAL myPort: " + myPort + ", succ: "+ successor + ", pred: "+predecessor);
 
 		if (selection.equals("@")) {
@@ -229,21 +259,39 @@ public class SimpleDynamoProvider extends ContentProvider {
 				null
 			);
 //			Log.d("qKEY", selection);
-		} else if (selection.equals("*") || selection.equals("GDump")) {
+		} else if (selection.equals("*") || selection.equals("GDump") || selection.equals("insertion")) {
 //			Log.d(TAG, "in * query myPort: " + myPort);
 
-			cursor = db.query(
-				TABLE_NAME,
-				projection,
-				null,
-				null,
-				null,
-				null,
-				sortOrder,
-				null
-			);
+			if (selection.equals("insertion")) {
+//				String[] selectionArgss = new String[]{selection};
+//				selection = "type=?";
+				String[] selectionArgss = new String[]{selection, originatorPort};
+				selection = "type=? and port=?";
 
-			if (selection.equals("GDump")) {
+				cursor = db.query(
+					TABLE_NAME,
+					projection,
+					selection,
+					selectionArgss,
+					null,
+					null,
+					sortOrder,
+					null
+				);
+			} else {
+				cursor = db.query(
+					TABLE_NAME,
+					projection,
+					null,
+					null,
+					null,
+					null,
+					sortOrder,
+					null
+				);
+			}
+
+			if (selection.equals("GDump") || selection.equals("insertion")) {
 				return cursor;
 			}
 
@@ -272,14 +320,14 @@ public class SimpleDynamoProvider extends ContentProvider {
 				selection = COLUMN_NAME_KEY + "=?";
 
 				cursor = db.query(
-						TABLE_NAME,
-						projection,
-						selection,
-						selectionArgss,
-						null,
-						null,
-						sortOrder,
-						"1"
+					TABLE_NAME,
+					projection,
+					selection,
+					selectionArgss,
+					null,
+					null,
+					sortOrder,
+					"1"
 				);
 
 //				Log.d("qKEY", selectionArgss[0]);
@@ -314,11 +362,11 @@ public class SimpleDynamoProvider extends ContentProvider {
 //			Log.d(TAG, "actSynchronously Start for " + portToConnect);
 			Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(portToConnect));
 			messageStruct msgStruct = new messageStruct(
-					msgType,
-					originatorPort,
-					key,
-					null,
-					null
+				msgType,
+				originatorPort,
+				key,
+				null,
+				null
 			);
 
 			ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
@@ -366,7 +414,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 		return null;
 	}
 
-	private class ClientTask extends AsyncTask<String, Void, Void> {
+	private class ClientTask extends AsyncTask<String, String, Void> {
 
 		@Override
 		protected Void doInBackground(String... msgs) {
@@ -375,81 +423,56 @@ public class SimpleDynamoProvider extends ContentProvider {
 			String msgType = msgs[0];
 			String nxtSuccessor = msgs[1];
 
-			if (msgType.equals("connect")) {
-				try {
-					Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
-
-					messageStruct msgStruct = new messageStruct(
-							msgType,
-							msgs[2]
-					);
-
-					ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-
-					out.writeObject(msgStruct);
-					out.flush();
-
-					ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-					ack = (messageStruct) in.readObject();
-
-					if (ack.successor != null && ack.successor.length() > 0) {
-						successor = ack.successor;
-					}
-					if (ack.predecessor != null && ack.predecessor.length() > 0) {
-						predecessor = ack.predecessor;
-					}
-
-					in.close();
-					socket.close();
-				} catch (Exception e) {
-					Log.e(TAG, "Client connect ExceptionFinal: " + e.toString());
-					e.printStackTrace();
-				}
-			} else if (msgType.equals("adjustRing")) {
-				try {
-					String adjustPort = msgs[1];
-					String adjustNode = msgs[2];
-					String adjustNodeToPort = msgs[3];
-					// Log.d(TAG, "Adjust Ring called for " + adjustPort  + "to assign " + adjustNode + " to port " + adjustNodeToPort);
-					Socket socket =new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(adjustPort));
-
-					messageStruct msgStruct = new messageStruct(
-							msgType,
-							adjustNode,
-							adjustNodeToPort
-					);
-
-					ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-					out.writeObject(msgStruct);
-					out.flush();
-
-					socket.close();
-				} catch (Exception e) {
-					Log.e(TAG, "Adjust connect ExceptionFinal: " + e.toString());
-					e.printStackTrace();
-				}
-			} else if (msgType.equals("insert") || msgType.equals("replication")) {
+			if (msgType.equals("insert") || msgType.equals("replication")) {
 				String key = msgs[2];
 				String value = msgs[3];
 
 //				Log.d(TAG, "Insert ClienTask for key: " + key + " myPort: " + myPort + " sent to: " + nxtSuccessor);
 				try {
 					Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
+					socket.setSoTimeout(100);
 
-					messageStruct msgStruct = new messageStruct(
-						msgType,
-						null,
-						key,
-						value
-					);
+					messageStruct msgStruct;
+					if (msgType.equals("replication")) {
+						msgStruct = new messageStruct(
+							msgType,
+							msgs[4],
+							key,
+							value
+						);
+					} else {
+						msgStruct = new messageStruct(
+							msgType,
+							null,
+							key,
+							value
+						);
+					}
 
 					ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
 					out.writeObject(msgStruct);
 					out.flush();
 
 					socket.close();
+				} catch (SocketTimeoutException e) {
+					Log.e(TAG,
+							"Client " + nxtSuccessor + " SocketTimeoutException " + key + " : " + e.toString());
+					String port = nxtSuccessor;
+
+					for (int i=0; i<2; i++) {
+						port = successorMap.get(port);
+
+						String[] forClientPublishProgress = new String[]{
+							"replication",
+							port,
+							key,
+							value,
+							nxtSuccessor
+						};
+						publishProgress(forClientPublishProgress);
+					}
 				} catch (Exception e) {
-					Log.e(TAG, "Client insert ExceptionFinal: " + e.toString());
+					Log.e(TAG, "Client " + msgType + " ExceptionFinal: " + e.toString());
 					e.printStackTrace();
 				}
 			} else if (msgType.equals("search")) {
@@ -475,9 +498,69 @@ public class SimpleDynamoProvider extends ContentProvider {
 					Log.e(TAG, "Client search ExceptionFinal: " + e.toString());
 					e.printStackTrace();
 				}
+			} else if (msgType.equals("replicate")) {
+				String originatorPort = msgs[2];
+
+//				Log.d(TAG, "Insert ClienTask for key: " + key + " myPort: " + myPort + " sent to: " + nxtSuccessor);
+				try {
+					Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
+
+					messageStruct msgStruct = new messageStruct(
+						msgType,
+						originatorPort,
+						null,
+						null
+					);
+
+					ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+					out.writeObject(msgStruct);
+					out.flush();
+
+					ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+					ack = (messageStruct) in.readObject();
+
+					Map<String, String> cursorKeyValueMap = ack.keyValueMap;
+
+					if (cursorKeyValueMap != null && !cursorKeyValueMap.isEmpty()) {
+						for (Map.Entry<String, String> entry : cursorKeyValueMap.entrySet()) {
+							Log.d(TAG, "looping replicate for failed nodes "+entry.getKey());
+							ContentValues values = new ContentValues();
+
+							values.put(SimpleDynamoProvider.COLUMN_NAME_KEY, entry.getKey());
+							values.put(SimpleDynamoProvider.COLUMN_NAME_VALUE, entry.getValue());
+
+							values.put("type", "replication");
+							values.put("port", originatorPort);
+							insertReplication(CONTENT_URI, values);
+						}
+					}
+
+					in.close();
+
+					socket.close();
+				} catch (Exception e) {
+					Log.e(TAG, "Client " + msgType + " ExceptionFinal: " + e.toString());
+					e.printStackTrace();
+				}
 			}
 
 			return null;
+		}
+
+		protected void onProgressUpdate(String... strings) {
+			/*
+			 * The following code displays what is received in doInBackground().
+			 */
+
+			if (strings[0].equals("replication")) {
+				new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "replication", strings[1], strings[2], strings[3], strings[4]);
+//			} else if (strings[0].equals("connect")) {
+//				new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "connect", strings[1], strings[2]);
+//			} else if (strings[0].equals("search")) {
+//				new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "search", strings[1], strings[2], strings[3]);
+			}
+
+			return;
 		}
 	}
 
@@ -499,319 +582,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 					msgPlusPortObject = (messageStruct) in.readObject();
 
-					if (msgPlusPortObject.msg.equals("connect")) {
-						String newNodeHash = null;
-						String port = msgPlusPortObject.port;
-
-						ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
-
-						try{
-							Integer emulatorId = Integer.parseInt(port)/2;
-							newNodeHash = genHash(emulatorId.toString());
-						} catch (NoSuchAlgorithmException e) {
-							Log.e(TAG, "emulatorId hash " + e.toString());
-						}
-
-						try{
-							if (successor != null) {
-								successorHash = genHash(String.valueOf((Integer.parseInt(successor) / 2)));
-							}
-						} catch (NoSuchAlgorithmException e) {
-							Log.e(TAG, "successorHash " + e.toString());
-						}
-
-						try{
-							if (predecessor != null) {
-								predecessorHash = genHash(String.valueOf((Integer.parseInt(predecessor) / 2)));
-							}
-						} catch (NoSuchAlgorithmException e) {
-							Log.e(TAG, "predecessorHash " + e.toString());
-						}
-
-
-						if (successor == null) {
-							predecessor = port;
-							successor = port;
-
-							msgPlusPortObject.successor = CONNECT_PORT;
-							msgPlusPortObject.predecessor = CONNECT_PORT;
-						} else if (successor == predecessor) {
-							if (newNodeHash.compareTo(successorHash) > 0) {
-								if (newNodeHash.compareTo(myPortHash) < 0) {
-									String[] forPublishProgress = new String[]{
-											"adjustRing",
-											predecessor,
-											"successor",
-											port
-									};
-									publishProgress(forPublishProgress);
-
-									forPublishProgress = new String[]{
-											"adjustRing",
-											port,
-											"successor",
-											myPort
-									};
-									publishProgress(forPublishProgress);
-
-									forPublishProgress = new String[]{
-											"adjustRing",
-											port,
-											"predecessor",
-											predecessor
-									};
-									publishProgress(forPublishProgress);
-
-									predecessor = port;
-								} else if (newNodeHash.compareTo(myPortHash) > 0) {
-									if (myPortHash.compareTo(successorHash) > 0) {
-										String[] forPublishProgress = new String[]{
-												"adjustRing",
-												port,
-												"predecessor",
-												myPort
-										};
-										publishProgress(forPublishProgress);
-
-										forPublishProgress = new String[]{
-												"adjustRing",
-												port,
-												"successor",
-												successor
-										};
-										publishProgress(forPublishProgress);
-
-										forPublishProgress = new String[]{
-												"adjustRing",
-												successor,
-												"predecessor",
-												port
-										};
-										publishProgress(forPublishProgress);
-
-										successor = port;
-									} else {
-										String[] forPublishProgress = new String[]{
-												"adjustRing",
-												port,
-												"predecessor",
-												successor
-										};
-										publishProgress(forPublishProgress);
-
-										forPublishProgress = new String[]{
-												"adjustRing",
-												port,
-												"successor",
-												myPort
-										};
-										publishProgress(forPublishProgress);
-
-										forPublishProgress = new String[]{
-												"adjustRing",
-												successor,
-												"successor",
-												port
-										};
-										publishProgress(forPublishProgress);
-
-										predecessor = port;
-									}
-								}
-							} else if (newNodeHash.compareTo(successorHash) < 0) {
-								if (newNodeHash.compareTo(myPortHash) < 0) {
-									if (myPortHash.compareTo(successorHash) > 0) {
-										String[] forPublishProgress = new String[]{
-												"adjustRing",
-												successor,
-												"predecessor",
-												port
-										};
-										publishProgress(forPublishProgress);
-
-										forPublishProgress = new String[]{
-												"adjustRing",
-												port,
-												"successor",
-												predecessor
-										};
-										publishProgress(forPublishProgress);
-
-										forPublishProgress = new String[]{
-												"adjustRing",
-												port,
-												"predecessor",
-												myPort
-										};
-										publishProgress(forPublishProgress);
-
-										successor = port;
-									} else {
-										String[] forPublishProgress = new String[]{
-												"adjustRing",
-												successor,
-												"successor",
-												port
-										};
-										publishProgress(forPublishProgress);
-
-										forPublishProgress = new String[]{
-												"adjustRing",
-												port,
-												"predecessor",
-												successor
-										};
-										publishProgress(forPublishProgress);
-
-										forPublishProgress = new String[]{
-												"adjustRing",
-												port,
-												"successor",
-												myPort
-										};
-										publishProgress(forPublishProgress);
-
-										predecessor = port;
-									}
-								} else if (newNodeHash.compareTo(myPortHash) > 0) {
-									String[] forPublishProgress = new String[]{
-											"adjustRing",
-											port,
-											"predecessor",
-											myPort
-									};
-									publishProgress(forPublishProgress);
-
-									forPublishProgress = new String[]{
-											"adjustRing",
-											port,
-											"successor",
-											successor
-									};
-									publishProgress(forPublishProgress);
-
-									forPublishProgress = new String[]{
-											"adjustRing",
-											successor,
-											"predecessor",
-											port
-									};
-									publishProgress(forPublishProgress);
-
-									successor = port;
-								}
-							}
-						} else if (successor != predecessor) {
-							if (newNodeHash.compareTo(successorHash) > 0 && newNodeHash.compareTo(predecessorHash) > 0) {
-								if (myPortHash.compareTo(predecessorHash) > 0 && myPortHash.compareTo(successorHash) > 0) {
-									String[] forPublishProgress = new String[]{
-											"adjustRing",
-											port,
-											"predecessor",
-											myPort
-									};
-									publishProgress(forPublishProgress);
-
-									forPublishProgress = new String[]{
-											"adjustRing",
-											port,
-											"successor",
-											successor
-									};
-									publishProgress(forPublishProgress);
-
-									forPublishProgress = new String[]{
-											"adjustRing",
-											successor,
-											"predecessor",
-											port
-									};
-									publishProgress(forPublishProgress);
-
-									successor = port;
-								} else {
-									String[] forPublishProgress = new String[]{
-											"connect",
-											successor,
-											port
-									};
-									publishProgress(forPublishProgress);
-
-								}
-							} else if (newNodeHash.compareTo(successorHash) < 0 && newNodeHash.compareTo(predecessorHash) < 0) {
-								if (myPortHash.compareTo(predecessorHash) < 0 && myPortHash.compareTo(successorHash) < 0) {
-									String[] forPublishProgress = new String[]{
-											"adjustRing",
-											port,
-											"successor",
-											myPort
-									};
-									publishProgress(forPublishProgress);
-
-									forPublishProgress = new String[]{
-											"adjustRing",
-											port,
-											"predecessor",
-											predecessor
-									};
-									publishProgress(forPublishProgress);
-
-									forPublishProgress = new String[]{
-											"adjustRing",
-											predecessor,
-											"successor",
-											port
-									};
-									publishProgress(forPublishProgress);
-
-									predecessor = port;
-								} else {
-									String[] forPublishProgress = new String[]{
-											"connect",
-											predecessor,
-											port
-									};
-									publishProgress(forPublishProgress);
-								}
-							} else if (newNodeHash.compareTo(myPortHash) > 0 && newNodeHash.compareTo(successorHash) < 0) {
-								msgPlusPortObject.successor = successor;
-								msgPlusPortObject.predecessor = myPort;
-
-								String[] forPublishProgress = new String[]{
-										"adjustRing",
-										successor,
-										"predecessor",
-										port
-								};
-								publishProgress(forPublishProgress);
-
-								successor = port;
-							} else if (newNodeHash.compareTo(myPortHash) < 0 && newNodeHash.compareTo(predecessorHash) > 0) {
-								msgPlusPortObject.successor = myPort;
-								msgPlusPortObject.predecessor = predecessor;
-
-								String[] forPublishProgress = new String[]{
-										"adjustRing",
-										predecessor,
-										"successor",
-										port
-								};
-								publishProgress(forPublishProgress);
-
-								predecessor = port;
-							}
-						}
-
-						out.writeObject(msgPlusPortObject);
-						out.flush();
-						out.close();
-					} else if (msgPlusPortObject.msg.equals("adjustRing")) {
-						if (msgPlusPortObject.adjustNode.equals("successor")) {
-							successor = msgPlusPortObject.adjustNodeToPort;
-						} else if (msgPlusPortObject.adjustNode.equals("predecessor")) {
-							predecessor = msgPlusPortObject.adjustNodeToPort;
-						}
-					} else if (msgPlusPortObject.msg.equals("insert") || msgPlusPortObject.msg.equals("replication")) {
+					if (msgPlusPortObject.msg.equals("insert") || msgPlusPortObject.msg.equals("replication")) {
 						ContentValues values = new ContentValues();
 
 						values.put(SimpleDynamoProvider.COLUMN_NAME_KEY, msgPlusPortObject.key);
@@ -819,11 +590,14 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 						if (msgPlusPortObject.msg.equals("replication")) {
 //							Log.d(TAG, "insertReplication ServerTask for key:" + " " + msgPlusPortObject.key + " myPort: " + myPort);
+							values.put("type", "replication");
+							values.put("port", msgPlusPortObject.originatorPort);
 							insertReplication(CONTENT_URI, values);
 						} else {
 
 //							Log.d(TAG, "Insert ServerTask for key: " + msgPlusPortObject.key + " myPort: " + myPort);
-
+							values.put("type", "insertion");
+							values.put("port", myPort);
 							insert(CONTENT_URI, values);
 //							Log.d(TAG, "Insert DONE ServerTask for key: " + msgPlusPortObject.key + " myPort: " + myPort);
 						}
@@ -873,6 +647,24 @@ public class SimpleDynamoProvider extends ContentProvider {
 								}
 								msgPlusPortObject.keyValueMap = cursorKeyValueMap;
 							}
+						}
+
+						ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
+						out.writeObject(msgPlusPortObject);
+						out.flush();
+						out.close();
+					} else if (msgPlusPortObject.msg.equals("replicate")) {
+						Cursor cursor = query(CONTENT_URI, null, "insertion", new String[]{msgPlusPortObject.originatorPort}, null);
+
+						if (cursor.getCount() > 0) {
+							cursor.moveToFirst();
+
+							Map<String, String> cursorKeyValueMap = new HashMap<String, String>();
+							while(!cursor.isAfterLast()) {
+								cursorKeyValueMap.put(cursor.getString(0), cursor.getString(1));
+								cursor.moveToNext();
+							}
+							msgPlusPortObject.keyValueMap = cursorKeyValueMap;
 						}
 
 						ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
@@ -941,9 +733,9 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 	public class SimpleDynamoDBHelper extends SQLiteOpenHelper {
 		public static final int DATABASE_VERSION = 1;
+//		private final String SQL_CREATE_TABLE = "CREATE TABLE " + TABLE_NAME + " (" + COLUMN_NAME_KEY + " " + "TEXT," + COLUMN_NAME_VALUE + " TEXT)";
 		private final String SQL_CREATE_TABLE =
-				"CREATE TABLE " + TABLE_NAME + " (" + COLUMN_NAME_KEY + " " +
-						"TEXT," + COLUMN_NAME_VALUE + " TEXT)";
+		"CREATE TABLE " + TABLE_NAME + " (" + COLUMN_NAME_KEY + " " + "TEXT," + COLUMN_NAME_VALUE + " TEXT,type TEXT,port TEXT)";
 
 
 		public SimpleDynamoDBHelper(Context context) {
