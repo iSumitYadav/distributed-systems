@@ -141,7 +141,11 @@ public class SimpleDynamoProvider extends ContentProvider {
 			newValues.put(SimpleDynamoProvider.COLUMN_NAME_VALUE, (String) values.get("value"));
 			newValues.put("type", "insertion");
 			newValues.put("port", myPort);
-			db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_IGNORE);
+			int updated = db.update(TABLE_NAME, newValues, COLUMN_NAME_KEY+"=?", new String[]{(String) values.get("key")});
+			if (updated == 0) {
+				db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_REPLACE);
+			}
+//			db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_IGNORE);
 //			db.insert(TABLE_NAME, null, values);
 
 			// REPLICATION
@@ -163,7 +167,12 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 	public Uri insertReplication(Uri uri, ContentValues values) {
 		Log.d(TAG, "insertReplicationFunc: " + " key: "+ (String) values.get("key") + " value: "+ (String) values.get("value") + " type: "+ (String) values.get("type") + " port: "+ (String) values.get("port") + " myPort: " + myPort);
-		db.insertWithOnConflict(TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_IGNORE);
+
+		int updated = db.update(TABLE_NAME, values, COLUMN_NAME_KEY+"=?", new String[]{(String) values.get("key")});
+		if (updated == 0) {
+			db.insertWithOnConflict(TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+		}
+//		db.insertWithOnConflict(TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_IGNORE);
 //		db.insert(TABLE_NAME, null, values);
 
 		return uri;

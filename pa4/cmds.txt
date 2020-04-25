@@ -1,0 +1,38 @@
+./simpledynamo-grading.osx -p 1 SimpleDynamo/app/build/outputs/apk/debug/app-debug.apk
+Testing no concurrency, no failure
+
+
+
+
+./simpledynamo-grading.osx -p 2 SimpleDynamo/app/build/outputs/apk/debug/app-debug.apk
+Testing concurrency, no failure
+
+
+
+
+./simpledynamo-grading.osx -p 3 SimpleDynamo/app/build/outputs/apk/debug/app-debug.apk
+Testing insert with existing keys, no failure
+
+
+
+
+./simpledynamo-grading.osx -p 4 SimpleDynamo/app/build/outputs/apk/debug/app-debug.apk
+Testing no concurrency, one failure
+
+
+
+
+./simpledynamo-grading.osx -p 5 SimpleDynamo/app/build/outputs/apk/debug/app-debug.apk
+Testing concurrency, one failure
+
+
+
+
+./simpledynamo-grading.osx -p 6 SimpleDynamo/app/build/outputs/apk/debug/app-debug.apk
+Testing concurrency, one consistent failure
+
+
+
+
+./simpledynamo-grading.osx SimpleDynamo/app/build/outputs/apk/debug/app-debug.apk
+THIS SHOULD BE FULLY WORKING WITH 23% BEFORE SUBMITTING
