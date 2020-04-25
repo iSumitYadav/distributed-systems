@@ -398,12 +398,12 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 //			Log.d(TAG, "QUERYING " + myPort + " " + selection);
 
-			if (myPort.equals(portToStoreKey)) {
+
 //				Log.d(TAG, "QUERYING myPort.equals(portToStoreKey) " + myPort + " " + selection);
 
-				selection = COLUMN_NAME_KEY + "=?";
+			selection = COLUMN_NAME_KEY + "=?";
 
-				cursor = db.query(
+			cursor = db.query(
 					TABLE_NAME,
 					projection,
 					selection,
@@ -412,47 +412,116 @@ public class SimpleDynamoProvider extends ContentProvider {
 					null,
 					sortOrder,
 					"1"
-				);
-				dummyCursor = db.query(
-						TABLE_NAME,
-						null,
-						selection,
-						selectionArgss,
-						null,
-						null,
-						sortOrder,
-						"1"
-				);
+			);
+			dummyCursor = db.query(
+					TABLE_NAME,
+					null,
+					selection,
+					selectionArgss,
+					null,
+					null,
+					sortOrder,
+					"1"
+			);
 
 //				Log.d(TAG, "qKEY " + selectionArgss[0]);
-				try {
-					if (cursor.getCount() > 0) {
-						Log.d(TAG, "query cursor myPort.equals" +
-								"(portToStoreKey) ");
-						Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+			try {
+				if (cursor.getCount() > 0) {
+					Log.d(TAG, "query cursor myPort.equals" +
+							"(portToStoreKey) ");
+					Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
 //						cursor.moveToFirst();
 //						Log.d(TAG,"cursor qKEY " + cursor.getString(0));
 //						Log.d(TAG,"cursor qVALUE "+ cursor.getString(1));
-					}
-				} catch (Exception e) {
-					Log.e(TAG, e.toString());
-					e.printStackTrace();
-				}
+				} else {
+					// TODO
+					//HERERERERERERERERRERERER CHECK IF KEY IS REPLICATED LOCALLY
+					// OR JUST QUERY LOCAL, IF NOT FOUND THEN SEARCH THE RING
+					Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
+					while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
+						try {
+							cursor = actSynchronously("search", portToStoreKey, selectionArgss[0], originatorPort);
+							Log.d(TAG, "query cursor myPort Not equals" +
+									"(portToStoreKey) ");
+							dummyCursor = cursor;
+							Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
 
-			} else {
-				Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
-				try {
-					cursor = actSynchronously("search", portToStoreKey, selectionArgss[0], originatorPort);
-					Log.d(TAG, "query cursor myPort Not equals" +
-							"(portToStoreKey) ");
-					dummyCursor = cursor;
-					Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+//							while (cursor.getCount() <= 0) {
+								portToStoreKey = successorMap.get(portToStoreKey);
+//								cursor = actSynchronously("search", portToStoreKey, selectionArgss[0], originatorPort);
+//							}
 //					cursor.moveToFirst();
-				} catch (Exception e) {
-					Log.e(TAG, "first call to actSynchronously: " + myPort);
-					e.printStackTrace();
+						} catch (Exception e) {
+							Log.e(TAG, "first call to actSynchronously: " + myPort);
+							e.printStackTrace();
+							continue;
+						}
+					}
 				}
+			} catch (Exception e) {
+				Log.e(TAG, "querying else " + e.toString());
+				e.printStackTrace();
 			}
+
+//			=================================
+//			if (myPort.equals(portToStoreKey)) {
+////				Log.d(TAG, "QUERYING myPort.equals(portToStoreKey) " + myPort + " " + selection);
+//
+//				selection = COLUMN_NAME_KEY + "=?";
+//
+//				cursor = db.query(
+//					TABLE_NAME,
+//					projection,
+//					selection,
+//					selectionArgss,
+//					null,
+//					null,
+//					sortOrder,
+//					"1"
+//				);
+//				dummyCursor = db.query(
+//						TABLE_NAME,
+//						null,
+//						selection,
+//						selectionArgss,
+//						null,
+//						null,
+//						sortOrder,
+//						"1"
+//				);
+//
+////				Log.d(TAG, "qKEY " + selectionArgss[0]);
+//				try {
+//					if (cursor.getCount() > 0) {
+//						Log.d(TAG, "query cursor myPort.equals" +
+//								"(portToStoreKey) ");
+//						Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+////						cursor.moveToFirst();
+////						Log.d(TAG,"cursor qKEY " + cursor.getString(0));
+////						Log.d(TAG,"cursor qVALUE "+ cursor.getString(1));
+//					}
+//				} catch (Exception e) {
+//					Log.e(TAG, e.toString());
+//					e.printStackTrace();
+//				}
+//
+//			} else {
+//				// TODO
+//				//HERERERERERERERERRERERER CHECK IF KEY IS REPLICATED LOCALLY
+//				// OR JUST QUERY LOCAL, IF NOT FOUND THEN SEARCH THE RING
+//				Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
+//				try {
+//					cursor = actSynchronously("search", portToStoreKey, selectionArgss[0], originatorPort);
+//					Log.d(TAG, "query cursor myPort Not equals" +
+//							"(portToStoreKey) ");
+//					dummyCursor = cursor;
+//					Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+////					cursor.moveToFirst();
+//				} catch (Exception e) {
+//					Log.e(TAG, "first call to actSynchronously: " + myPort);
+//					e.printStackTrace();
+//				}
+//			}
 		}
 
 		return cursor;
@@ -512,6 +581,16 @@ public class SimpleDynamoProvider extends ContentProvider {
 					"query Client search ExceptionFinal: " + e.toString() +
 							" actSynchronously Start for msgType:" + msgType + " " + "portToConnect: " + portToConnect + " key: "+key+ " originatorPort:" + originatorPort);
 			e.printStackTrace();
+
+//			Cursor cursor = null;
+//			portToConnect = successorMap.get(portToConnect);
+//			if (!portToConnect.equals(myPort)) {
+//				cursor = actSynchronously(msgType, portToConnect, key,
+//						originatorPort);
+//				if (cursor.getCount() > 0) {
+//					return cursor;
+//				}
+//			}
 		}
 
 		return null;
