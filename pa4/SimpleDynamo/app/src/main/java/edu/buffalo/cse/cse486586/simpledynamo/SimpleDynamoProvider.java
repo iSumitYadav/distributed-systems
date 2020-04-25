@@ -21,6 +21,7 @@ import android.content.ContentProvider;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
+import android.database.DatabaseUtils;
 import android.database.MatrixCursor;
 import android.database.MergeCursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -93,10 +94,17 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 		String portToStoreKey = getNodeToStoreKey(hashedKey);
 
-//		Log.d(TAG, "INSERTION " + myPort + " " + originalKey);
+		Log.d(TAG, "INSERTION " + myPort + " " + originalKey);
 		if (myPort.equals(portToStoreKey)) {
-//			Log.d(TAG, "INSERTION myPort.equals(portToStoreKey) " + myPort + " " + originalKey);
-			db.insert(TABLE_NAME, null, values);
+			Log.d(TAG, "INSERTION myPort.equals(portToStoreKey) " + myPort + " " + originalKey);
+			ContentValues newValues = new ContentValues();
+
+			newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, originalKey);
+			newValues.put(SimpleDynamoProvider.COLUMN_NAME_VALUE, (String) values.get("value"));
+			newValues.put("type", "insertion");
+			newValues.put("port", myPort);
+			db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_IGNORE);
+//			db.insert(TABLE_NAME, null, values);
 
 			// REPLICATION
 			String port = myPort;
@@ -107,7 +115,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 			}
 
 		} else {
-//			Log.d(TAG, "INSERTION myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + originalKey);
+			Log.d(TAG, "INSERTION myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + originalKey);
 			new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", portToStoreKey, originalKey, (String) values.get("value"));
 		}
 
@@ -116,7 +124,9 @@ public class SimpleDynamoProvider extends ContentProvider {
 	}
 
 	public Uri insertReplication(Uri uri, ContentValues values) {
-		db.insert(TABLE_NAME, null, values);
+		Log.d(TAG, "insertReplicationFunc: " + " key: "+ (String) values.get("key") + " value: "+ (String) values.get("value") + " type: "+ (String) values.get("type") + " port: "+ (String) values.get("port") + " myPort: " + myPort);
+		db.insertWithOnConflict(TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_IGNORE);
+//		db.insert(TABLE_NAME, null, values);
 
 		return uri;
 	}
@@ -205,6 +215,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 				for (int i=0; i<2; i++) {
 					port = predecessorMap.get(port);
 
+					Log.d(TAG, "calling pred: " + port + " to replicate from:" + " " + myPort);
 					new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "replicate", port, myPort);
 
 //					Cursor cursor = actSynchronously("replicate", port,	"*", null);
@@ -224,6 +235,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 					port = successorMap.get(port);
 
 //					implement this + check why replication of insertion of failed not working + segregate insert & replication & fix for loop for always 2 succ/pred
+					Log.d(TAG, "calling succ: " + port + " to getMissedInsert from:" + myPort);
 					new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "getMissedInsert", port, myPort);
 //					new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "replicate", port, myPort);
 
@@ -243,13 +255,16 @@ public class SimpleDynamoProvider extends ContentProvider {
 	public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
 		// TODO Auto-generated method stub
 		Cursor cursor = null;
+		Cursor dummyCursor = null;
 
 		String originatorPort = myPort;
 		if (selectionArgs!= null && selectionArgs.length >= 1 && selectionArgs[0] != null) {
 			originatorPort = selectionArgs[0];
 		}
+		Log.d(TAG, "qKEY selection:" + selection + " myPort: "+ myPort + " " + "originatorPort: " + originatorPort);
 
 		projection = new String[]{COLUMN_NAME_KEY, COLUMN_NAME_VALUE};
+
 
 //		Log.d(TAG, "replicate query insertion 1");
 //		Log.d(TAG, "QUERY GLOBAL myPort: " + myPort + ", succ: "+ successor + ", pred: "+predecessor);
@@ -265,7 +280,19 @@ public class SimpleDynamoProvider extends ContentProvider {
 				sortOrder,
 				null
 			);
-//			Log.d("qKEY", selection);
+			Log.d(TAG, "query: @");
+			dummyCursor = db.query(
+					TABLE_NAME,
+					null,
+					null,
+					null,
+					null,
+					null,
+					sortOrder,
+					null
+			);
+			Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+//			Log.d(TAG, "qKEY " + selection);
 		} else if (selection.equals("*") || selection.equals("GDump") || selection.equals("insertion") || selection.equals("replication")) {
 //			Log.d(TAG, "in * query myPort: " + myPort);
 
@@ -303,6 +330,16 @@ public class SimpleDynamoProvider extends ContentProvider {
 							sortOrder,
 							null
 					);
+					dummyCursor = db.query(
+							TABLE_NAME,
+							null,
+							selection,
+							selectionArgss,
+							null,
+							null,
+							sortOrder,
+							null
+					);
 //					Log.d(TAG, "replicate query insertion 5");
 				} catch (Exception e) {
 					Log.e(TAG,
@@ -320,10 +357,23 @@ public class SimpleDynamoProvider extends ContentProvider {
 					sortOrder,
 					null
 				);
+				dummyCursor = db.query(
+						TABLE_NAME,
+						null,
+						null,
+						null,
+						null,
+						null,
+						sortOrder,
+						null
+				);
 			}
 
 			if (selection.equals("GDump") || dupSelection.equals("insertion") || dupSelection.equals("replication")) {
 //				Log.d(TAG, "replicate query insertion 6");
+				Log.d(TAG, "query " + dupSelection);
+				Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+//				cursor.moveToFirst();
 				return cursor;
 			}
 
@@ -333,6 +383,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 				cursor = new MergeCursor(new Cursor[]{cursor, successorCursor});
 			}
+			Log.d(TAG, "query *");
+			Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
 		} else {
 			String hashedKey = null;
 			try {
@@ -361,14 +413,26 @@ public class SimpleDynamoProvider extends ContentProvider {
 					sortOrder,
 					"1"
 				);
+				dummyCursor = db.query(
+						TABLE_NAME,
+						null,
+						selection,
+						selectionArgss,
+						null,
+						null,
+						sortOrder,
+						"1"
+				);
 
-//				Log.d("qKEY", selectionArgss[0]);
+//				Log.d(TAG, "qKEY " + selectionArgss[0]);
 				try {
 					if (cursor.getCount() > 0) {
-						// Log.d("cursor is NOT Null", DatabaseUtils.dumpCursorToString(cursor));
-						cursor.moveToFirst();
-//						Log.d("qKEY cursor", cursor.getString(0));
-//						Log.d("qVALUE cursor", cursor.getString(1));
+						Log.d(TAG, "query cursor myPort.equals" +
+								"(portToStoreKey) ");
+						Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+//						cursor.moveToFirst();
+//						Log.d(TAG,"cursor qKEY " + cursor.getString(0));
+//						Log.d(TAG,"cursor qVALUE "+ cursor.getString(1));
 					}
 				} catch (Exception e) {
 					Log.e(TAG, e.toString());
@@ -376,9 +440,14 @@ public class SimpleDynamoProvider extends ContentProvider {
 				}
 
 			} else {
-//				Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
+				Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
 				try {
 					cursor = actSynchronously("search", portToStoreKey, selectionArgss[0], originatorPort);
+					Log.d(TAG, "query cursor myPort Not equals" +
+							"(portToStoreKey) ");
+					dummyCursor = cursor;
+					Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+//					cursor.moveToFirst();
 				} catch (Exception e) {
 					Log.e(TAG, "first call to actSynchronously: " + myPort);
 					e.printStackTrace();
@@ -466,8 +535,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 					Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
 					socket.setSoTimeout(100);
 
-					Log.d(TAG, msgType + " ClienTask for key: " + key + " " +
-							"myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG");
+					Log.d(TAG, msgType + " ClienTask for key: " + key + " " + "myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG");
 					messageStruct msgStruct;
 					if (msgType.equals("replication")) {
 						msgStruct = new messageStruct(
@@ -494,8 +562,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 					in.close();
 
 					socket.close();
-					Log.d(TAG, msgType + " ClienTask for key: " + key + " " +
-							"myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG SENT");
+//					Log.d(TAG, msgType + " ClienTask for key: " + key + " " + "myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG SENT");
 				} catch (EOFException e) {
 					Log.e(TAG, "ClientTask " + msgType + " " + nxtSuccessor + " SocketTimeoutException " + key + " : " + e.toString());
 
@@ -585,7 +652,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 					if (cursorKeyValueMap != null && !cursorKeyValueMap.isEmpty()) {
 						for (Map.Entry<String, String> entry : cursorKeyValueMap.entrySet()) {
-							Log.d(TAG, "looping replicate for failed nodes " + entry.getKey() + "myPort: " + myPort + " from node: " + nxtSuccessor);
+							Log.d(TAG,
+									"looping "+msgType+" for failed nodes " + entry.getKey() + " myPort: " + myPort + " from node: " + nxtSuccessor);
 							ContentValues values = new ContentValues();
 
 							values.put(SimpleDynamoProvider.COLUMN_NAME_KEY, entry.getKey());
