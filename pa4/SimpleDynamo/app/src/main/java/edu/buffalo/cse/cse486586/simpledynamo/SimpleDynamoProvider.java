@@ -451,7 +451,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 						cursor.moveToFirst();
 						Log.d(TAG,"cursor qKEY " + cursor.getString(0));
 						Log.d(TAG,"cursor qVALUE "+ cursor.getString(1));
-				} else if (!selectionArgss[0].equals("deletePhaseON")) {
+				} else {
 					// TODO
 					//HERERERERERERERERRERERER CHECK IF KEY IS REPLICATED LOCALLY
 					// OR JUST QUERY LOCAL, IF NOT FOUND THEN SEARCH THE RING
