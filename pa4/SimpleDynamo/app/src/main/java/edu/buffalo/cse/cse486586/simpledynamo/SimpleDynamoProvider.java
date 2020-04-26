@@ -8,8 +8,6 @@ import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -32,37 +30,30 @@ import android.telephony.TelephonyManager;
 import android.util.Log;
 
 public class SimpleDynamoProvider extends ContentProvider {
-	static final String TAG = SimpleDynamoActivity.class.getSimpleName();
-	static final Uri CONTENT_URI = Uri.parse("content://edu.buffalo.cse.cse486586.simpledynamo.provider");
-
-	private SQLiteDatabase db;
 	public static final String TABLE_NAME = "messages";
 	public static final String COLUMN_NAME_KEY = "key";
 	public static final String COLUMN_NAME_VALUE = "value";
-
+	static final String TAG = SimpleDynamoActivity.class.getSimpleName();
+	static final Uri CONTENT_URI = Uri.parse("content://edu.buffalo.cse.cse486586.simpledynamo.provider");
 	static final int SERVER_PORT = 10000;
 	static final String CONNECT_PORT = "";
-
 	String myPort = null;
 	String portStr = null;
-	String INSERTION = null;
+	boolean INSERTION = false;
 	String myPortHash = null;
-
 	String successor = null;
 	String predecessor = null;
 	String successorHash = null;
 	String predecessorHash = null;
-
 	Map<String, String> successorMap = new HashMap<String, String>();
 	Map<String, String> predecessorMap = new HashMap<String, String>();
 	Map<String, String> portHashMap = new HashMap<String, String>();
-
 	ArrayList<String> list1 = new ArrayList<String>();
 	ArrayList<String> list2 = new ArrayList<String>();
 	ArrayList<String> list3 = new ArrayList<String>();
 	ArrayList<String> list4 = new ArrayList<String>();
 	Map<ArrayList<String>, String> hashedKeyToNodeMap = new HashMap<ArrayList<String>, String>();
-
+	private SQLiteDatabase db;
 
 	@Override
 	public int delete(Uri uri, String selection, String[] selectionArgs) {
@@ -107,7 +98,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 	public Uri insert(Uri uri, ContentValues values) {
 		// TODO Auto-generated method stub
 		String originalKey = (String) values.get("key");
-		INSERTION = originalKey;
+		INSERTION = true;
 		String hashedKey = null;
 		try {
 			hashedKey = genHash(originalKey);
@@ -145,7 +136,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 			// Log.d(TAG, "INSERTION myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + originalKey);
 			new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", portToStoreKey, originalKey, (String) values.get("value"));
 		}
-		INSERTION = null;
+		INSERTION = false;
 
 
 		return uri;
@@ -153,12 +144,12 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 	public Uri insertReplication(Uri uri, ContentValues values) {
 		// Log.d(TAG, "insertReplicationFunc: " + " key: "+ (String) values.get("key") + " value: "+ (String) values.get("value") + " type: "+ (String) values.get("type") + " port: "+ (String) values.get("port") + " myPort: " + myPort);
-		INSERTION = (String) values.get("key");
+		INSERTION = true;
 		int updated = db.update(TABLE_NAME, values, COLUMN_NAME_KEY+"=?", new String[]{(String) values.get("key")});
 		if (updated == 0) {
 			db.insertWithOnConflict(TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_REPLACE);
 		}
-		INSERTION = null;
+		INSERTION = false;
 //		db.insertWithOnConflict(TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_IGNORE);
 //		db.insert(TABLE_NAME, null, values);
 
@@ -272,7 +263,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 		Cursor cursor = null;
 		Cursor dummyCursor = null;
 
-		while(INSERTION != null && selection.equals(INSERTION)) {
+		while(INSERTION) {
 			Log.d(TAG, "INSERTION BEING DONE FOR KEY: " + selection);
 		}
 
@@ -616,6 +607,39 @@ public class SimpleDynamoProvider extends ContentProvider {
 		return null;
 	}
 
+	@Override
+	public int update(Uri uri, ContentValues values, String selection,
+			String[] selectionArgs) {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	public String getNodeToStoreKey(String hashedKey) {
+		ArrayList<String> list;
+
+		for (Map.Entry<ArrayList<String>, String> entry : hashedKeyToNodeMap.entrySet()) {
+			list = entry.getKey();
+
+			if (hashedKey.compareTo(list.get(0)) > 0 && hashedKey.compareTo(list.get(1)) <= 0) {
+				return entry.getValue();
+			}
+		}
+
+		return "11124";
+	}
+
+//	================================================================================
+
+    private String genHash(String input) throws NoSuchAlgorithmException {
+        MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
+        byte[] sha1Hash = sha1.digest(input.getBytes());
+        Formatter formatter = new Formatter();
+        for (byte b : sha1Hash) {
+            formatter.format("%02x", b);
+        }
+        return formatter.toString();
+    }
+
 	private class ClientTask extends AsyncTask<String, String, Void> {
 
 		@Override
@@ -952,39 +976,6 @@ public class SimpleDynamoProvider extends ContentProvider {
 			return;
 		}
 	}
-
-//	================================================================================
-
-	@Override
-	public int update(Uri uri, ContentValues values, String selection,
-			String[] selectionArgs) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-
-	public String getNodeToStoreKey(String hashedKey) {
-		ArrayList<String> list;
-
-		for (Map.Entry<ArrayList<String>, String> entry : hashedKeyToNodeMap.entrySet()) {
-			list = entry.getKey();
-
-			if (hashedKey.compareTo(list.get(0)) > 0 && hashedKey.compareTo(list.get(1)) <= 0) {
-				return entry.getValue();
-			}
-		}
-
-		return "11124";
-	}
-
-    private String genHash(String input) throws NoSuchAlgorithmException {
-        MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
-        byte[] sha1Hash = sha1.digest(input.getBytes());
-        Formatter formatter = new Formatter();
-        for (byte b : sha1Hash) {
-            formatter.format("%02x", b);
-        }
-        return formatter.toString();
-    }
 
 	public class SimpleDynamoDBHelper extends SQLiteOpenHelper {
 		public static final int DATABASE_VERSION = 1;
