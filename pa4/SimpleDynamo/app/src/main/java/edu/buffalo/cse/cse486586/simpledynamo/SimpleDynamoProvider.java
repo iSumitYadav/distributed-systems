@@ -264,7 +264,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 		Cursor dummyCursor = null;
 
 		while(INSERTION) {
-			Log.d(TAG, "INSERTION BEING DONE FOR KEY: " + selection);
+			Log.d(TAG, "score INSERTION BEING DONE FOR KEY: " + selection);
 		}
 
 		String originatorPort = myPort;
