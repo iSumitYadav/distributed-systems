@@ -113,14 +113,16 @@ public class SimpleDynamoProvider extends ContentProvider {
 			// Log.d(TAG, "INSERTION myPort.equals(portToStoreKey) " + myPort + " " + originalKey);
 			ContentValues newValues = new ContentValues();
 
-			newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, originalKey);
+//			newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, originalKey);
 			newValues.put(SimpleDynamoProvider.COLUMN_NAME_VALUE, (String) values.get("value"));
 			newValues.put("type", "insertion");
 			newValues.put("port", myPort);
-			int updated = db.update(TABLE_NAME, newValues, COLUMN_NAME_KEY+"=?", new String[]{(String) values.get("key")});
+			int updated = db.update(TABLE_NAME, newValues, COLUMN_NAME_KEY+"=?", new String[]{originalKey});
 			if (updated == 0) {
+				newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, originalKey);
 				db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_REPLACE);
 			}
+
 //			db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_IGNORE);
 //			db.insert(TABLE_NAME, null, values);
 
@@ -130,11 +132,13 @@ public class SimpleDynamoProvider extends ContentProvider {
 				port = successorMap.get(port);
 
 				new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "replication", port, originalKey, (String) values.get("value"), myPort);
+//				actSynchronously("replication", port, originalKey, (String) values.get("value"), myPort);
 			}
 
 		} else {
 			// Log.d(TAG, "INSERTION myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + originalKey);
-			new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", portToStoreKey, originalKey, (String) values.get("value"));
+//			new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", portToStoreKey, originalKey, (String) values.get("value"));
+			actSynchronously("insert", portToStoreKey, originalKey, (String) values.get("value"));
 		}
 		INSERTION = false;
 
@@ -142,12 +146,19 @@ public class SimpleDynamoProvider extends ContentProvider {
 		return uri;
 	}
 
-	public Uri insertReplication(Uri uri, ContentValues values) {
+	public Uri insertReplication(Uri uri, String key, String value, String type, String port) {
 		// Log.d(TAG, "insertReplicationFunc: " + " key: "+ (String) values.get("key") + " value: "+ (String) values.get("value") + " type: "+ (String) values.get("type") + " port: "+ (String) values.get("port") + " myPort: " + myPort);
 		INSERTION = true;
-		int updated = db.update(TABLE_NAME, values, COLUMN_NAME_KEY+"=?", new String[]{(String) values.get("key")});
+		ContentValues newValues = new ContentValues();
+
+//			newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, originalKey);
+		newValues.put(SimpleDynamoProvider.COLUMN_NAME_VALUE, value);
+		newValues.put("type", type);
+		newValues.put("port", port);
+		int updated = db.update(TABLE_NAME, newValues, COLUMN_NAME_KEY+"=?", new String[]{key});
 		if (updated == 0) {
-			db.insertWithOnConflict(TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+			newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, key);
+			db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_REPLACE);
 		}
 		INSERTION = false;
 //		db.insertWithOnConflict(TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_IGNORE);
@@ -237,6 +248,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 					// Log.d(TAG, "calling pred: " + port + " to replicate from:" + " " + myPort);
 					new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "replicate", port, myPort);
+//					actSynchronously("replicate", port, myPort, null);
 				}
 
 				port = myPort;
@@ -244,8 +256,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 					port = successorMap.get(port);
 					// Log.d(TAG, "calling succ: " + port + " to getMissedInsert from:" + myPort);
 					new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "getMissedInsert", port, myPort);
-
-
+//					actSynchronously("getMissedInsert", port, myPort, null);
 				}
 				return true;
 			}
@@ -388,8 +399,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 				while (!succ.equals(myPort)) {
 					try {
 
-						successorCursor = actSynchronously("search", succ,
-								"@", originatorPort);
+						successorCursor = actSynchronously("search", succ, originatorPort, "@");
 						cursor = new MergeCursor(new Cursor[]{cursor, successorCursor});
 
 						succ = successorMap.get(succ);
@@ -459,7 +469,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 					while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
 //					while (cursor == null || cursor.getCount() <= 0) {
 						try {
-							cursor = actSynchronously("search", portToStoreKey, selectionArgss[0], originatorPort);
+							cursor = actSynchronously("search", portToStoreKey, originatorPort, selectionArgss[0]);
 							Log.d(TAG, "query cursor myPort Not equals" +
 									"(portToStoreKey) ");
 							dummyCursor = cursor;
@@ -467,7 +477,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 //							while (cursor.getCount() <= 0) {
 //								portToStoreKey = successorMap.get(portToStoreKey);
-//								cursor = actSynchronously("search", portToStoreKey, selectionArgss[0], originatorPort);
+//								cursor = actSynchronously("search", portToStoreKey, originatorPort, selectionArgss[0]);
 //							}
 //					cursor.moveToFirst();
 						} catch (Exception e) {
@@ -532,7 +542,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //				// OR JUST QUERY LOCAL, IF NOT FOUND THEN SEARCH THE RING
 //				Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
 //				try {
-//					cursor = actSynchronously("search", portToStoreKey, selectionArgss[0], originatorPort);
+//					cursor = actSynchronously("search", portToStoreKey, originatorPort, selectionArgss[0]);
 //					Log.d(TAG, "query cursor myPort Not equals" +
 //							"(portToStoreKey) ");
 //					dummyCursor = cursor;
@@ -548,62 +558,151 @@ public class SimpleDynamoProvider extends ContentProvider {
 		return cursor;
 	}
 
-	public Cursor actSynchronously(String msgType, String portToConnect, String key, String originatorPort) {
-		try {
-			Log.d(TAG, "actSynchronously Start for msgType:" + msgType + " " + "portToConnect: " + portToConnect + " key: "+key+ " originatorPort:" + originatorPort);
-			Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(portToConnect));
-			messageStruct msgStruct = new messageStruct(
-				msgType,
-				originatorPort,
-				key,
-				null,
-				null
-			);
+	public Cursor actSynchronously(String msgType, String portToConnect, String originatorPort, String key) {
+		if (msgType.equals("search")) {
+			try {
+				Log.d(TAG, "actSynchronously Start for msgType:" + msgType + " " + "portToConnect: " + portToConnect + " key: " + key + " originatorPort:" + originatorPort);
+				Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(portToConnect));
+				messageStruct msgStruct = new messageStruct(
+						msgType,
+						originatorPort,
+						key,
+						null,
+						null
+				);
 
-			ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-			out.writeObject(msgStruct);
-			out.flush();
-
-
-			messageStruct ack = new messageStruct();
-			ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-			ack = (messageStruct) in.readObject();
+				ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+				out.writeObject(msgStruct);
+				out.flush();
 
 
-			MatrixCursor matrixCursor;
-			matrixCursor = new MatrixCursor(new String[]{COLUMN_NAME_KEY, COLUMN_NAME_VALUE});
+				messageStruct ack = new messageStruct();
+				ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+				ack = (messageStruct) in.readObject();
 
-			if (!(key.equals("*") || key.equals("@"))) {
-				MatrixCursor.RowBuilder newRow = matrixCursor.newRow();
-				if (!ack.value.equals(null)) {
-					newRow.add(ack.key);
-					newRow.add(ack.value);
+
+				MatrixCursor matrixCursor;
+				matrixCursor = new MatrixCursor(new String[]{COLUMN_NAME_KEY, COLUMN_NAME_VALUE});
+
+				if (!(key.equals("*") || key.equals("@"))) {
+					MatrixCursor.RowBuilder newRow = matrixCursor.newRow();
+					if (!ack.value.equals(null)) {
+						newRow.add(ack.key);
+						newRow.add(ack.value);
+
+						return matrixCursor;
+					}
+				} else {
+					Map<String, String> cursorKeyValueMap = ack.keyValueMap;
+
+					if (cursorKeyValueMap != null && !cursorKeyValueMap.isEmpty()) {
+						for (Map.Entry<String, String> entry : cursorKeyValueMap.entrySet()) {
+							MatrixCursor.RowBuilder newRow = matrixCursor.newRow();
+							newRow.add(entry.getKey());
+							newRow.add(entry.getValue());
+						}
+					}
 
 					return matrixCursor;
 				}
-			} else {
-				Map<String, String> cursorKeyValueMap = ack.keyValueMap;
 
-				if (cursorKeyValueMap != null && !cursorKeyValueMap.isEmpty()) {
-					for (Map.Entry<String, String> entry : cursorKeyValueMap.entrySet()) {
-						MatrixCursor.RowBuilder newRow = matrixCursor.newRow();
-						newRow.add(entry.getKey());
-						newRow.add(entry.getValue());
-					}
-				}
-
-				return matrixCursor;
+				in.close();
+				socket.close();
+			} catch (Exception e) {
+				Log.e(TAG,
+						"query Client search ExceptionFinal: " + e.toString() +
+								" actSynchronously Start for msgType:" + msgType + " " + "portToConnect: " + portToConnect + " key: " + key + " originatorPort:" + originatorPort);
+				e.printStackTrace();
 			}
 
-			in.close();
-			socket.close();
-		} catch (Exception e) {
-			Log.e(TAG,
-					"query Client search ExceptionFinal: " + e.toString() +
-							" actSynchronously Start for msgType:" + msgType + " " + "portToConnect: " + portToConnect + " key: "+key+ " originatorPort:" + originatorPort);
-			e.printStackTrace();
-		}
+		} else if (msgType.equals("insert") || msgType.equals("replication")) {
+			messageStruct ack = new messageStruct();
 
+//			String msgType = msgs[0];
+			String nxtSuccessor = portToConnect;
+			String _key = originatorPort;
+			String value = key;
+
+			Log.d(TAG,
+					msgType + " ClienTask for key: " + _key + " myPort: " + myPort + " sent to: " + nxtSuccessor);
+			try {
+				Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
+				socket.setSoTimeout(100);
+
+				Log.d(TAG, msgType + " ClienTask for key: " + _key + " " +
+						"myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG");
+				messageStruct msgStruct;
+//				if (msgType.equals("replication")) {
+//					msgStruct = new messageStruct(
+//							msgType,
+//							msgs[4],
+//							_key,
+//							value
+//					);
+//				} else {
+					msgStruct = new messageStruct(
+							msgType,
+							null,
+							_key,
+							value
+					);
+//				}
+
+				ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
+				out.writeObject(msgStruct);
+				out.flush();
+
+				ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+				ack = (messageStruct) in.readObject();
+				in.close();
+
+				socket.close();
+//					Log.d(TAG, msgType + " ClienTask for key: " + _key + " "
+//					+ "myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG SENT");
+			} catch (EOFException e) {
+				Log.e(TAG, "ClientTask " + msgType + " " + nxtSuccessor + " " +
+						"SocketTimeoutException " + _key + " : " + e.toString());
+
+				String[] forClientPublishProgress = null;
+				if (msgType.equals("insert")) {
+					String port = nxtSuccessor;
+
+					for (int i = 0; i < 2; i++) {
+						port = successorMap.get(port);
+
+//						forClientPublishProgress = new String[]{
+//								"replication",
+//								port,
+//								_key,
+//								value,
+//								nxtSuccessor
+//						};
+//
+//						publishProgress(forClientPublishProgress);
+						new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "replication", port, _key, value, nxtSuccessor);
+					}
+//					} else if (msgType.equals("replication")) {
+//						String port = nxtSuccessor;
+//						String originatorPort = msgs[4];
+//
+//						for (int i=0; i<2; i++) {
+//							port = successorMap.get(port);
+//
+//							forClientPublishProgress = new String[]{
+//								"replication",
+//								port,
+//								_key,
+//								value,
+//								nxtSuccessor
+//							};
+//						}
+				}
+			} catch (Exception e) {
+				Log.e(TAG,
+						"Client " + msgType + " ExceptionFinal: " + nxtSuccessor + " " + e.toString());
+				e.printStackTrace();
+			}
+		}
 		return null;
 	}
 
@@ -777,19 +876,21 @@ public class SimpleDynamoProvider extends ContentProvider {
 						for (Map.Entry<String, String> entry : cursorKeyValueMap.entrySet()) {
 							Log.d(TAG,
 									"looping "+msgType+" for failed nodes " + entry.getKey() + " myPort: " + myPort + " from node: " + nxtSuccessor);
-							ContentValues values = new ContentValues();
+//							ContentValues values = new ContentValues();
 
-							values.put(SimpleDynamoProvider.COLUMN_NAME_KEY, entry.getKey());
-							values.put(SimpleDynamoProvider.COLUMN_NAME_VALUE, entry.getValue());
+//							values.put(SimpleDynamoProvider.COLUMN_NAME_KEY, entry.getKey());
+//							values.put(SimpleDynamoProvider.COLUMN_NAME_VALUE, entry.getValue());
 
+							String values_type = null;
+							String values_port = null;
 							if (msgType.equals("getMissedInsert")) {
-								values.put("type", "insertion");
-								values.put("port", myPort);
+								values_type = "insertion";
+								values_port = myPort;
 							} else if (msgType.equals("replicate")) {
-								values.put("type", "replication");
-								values.put("port", nxtSuccessor);
+								values_type = "replication";
+								values_port = nxtSuccessor;
 							}
-							insertReplication(CONTENT_URI, values);
+							insertReplication(CONTENT_URI, entry.getKey(), entry.getValue(), values_type, values_port);
 						}
 					}
 
@@ -841,19 +942,23 @@ public class SimpleDynamoProvider extends ContentProvider {
 					msgPlusPortObject = (messageStruct) in.readObject();
 
 					if (msgPlusPortObject.msg.equals("insert") || msgPlusPortObject.msg.equals("replication")) {
-						ContentValues values = new ContentValues();
-
-						values.put(SimpleDynamoProvider.COLUMN_NAME_KEY, msgPlusPortObject.key);
-						values.put(SimpleDynamoProvider.COLUMN_NAME_VALUE, msgPlusPortObject.value);
+//						ContentValues values = new ContentValues();
+//
+//						values.put(SimpleDynamoProvider.COLUMN_NAME_KEY, msgPlusPortObject.key);
+//						values.put(SimpleDynamoProvider.COLUMN_NAME_VALUE, msgPlusPortObject.value);
 
 						if (msgPlusPortObject.msg.equals("replication")) {
 							Log.d(TAG, "insertReplication ServerTask for key:" + " " + msgPlusPortObject.key + " myPort: " + myPort);
-							values.put("type", "replication");
-							values.put("port", msgPlusPortObject.originatorPort);
-							insertReplication(CONTENT_URI, values);
-						} else {
 
+							String values_type = "replication";
+							String values_port = msgPlusPortObject.originatorPort;
+							insertReplication(CONTENT_URI, msgPlusPortObject.key, msgPlusPortObject.value, values_type, values_port);
+						} else {
 							Log.d(TAG, "Insert ServerTask for key: " + msgPlusPortObject.key + " myPort: " + myPort);
+							ContentValues values = new ContentValues();
+
+							values.put(SimpleDynamoProvider.COLUMN_NAME_KEY, msgPlusPortObject.key);
+							values.put(SimpleDynamoProvider.COLUMN_NAME_VALUE, msgPlusPortObject.value);
 							values.put("type", "insertion");
 							values.put("port", myPort);
 							insert(CONTENT_URI, values);
@@ -880,7 +985,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 									cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
 								} else if (hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) < 0) {
 									Log.d(TAG, "hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) < 0");
-									cursor = actSynchronously("search", successor, msgPlusPortObject.key, msgPlusPortObject.originatorPort);
+									cursor = actSynchronously("search", successor, msgPlusPortObject.originatorPort, msgPlusPortObject.key);
 								} else if (hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) > 0) {
 									cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
 								}
@@ -893,7 +998,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 							} else {
 								Log.d(TAG, "else in server search");
 								cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
-//								cursor = actSynchronously("search", successor, msgPlusPortObject.key, msgPlusPortObject.originatorPort);
+//								cursor = actSynchronously("search", successor, msgPlusPortObject.originatorPort, msgPlusPortObject.key);
 							}
 							if (cursor.getCount() > 0) {
 								cursor.moveToFirst();
