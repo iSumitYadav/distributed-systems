@@ -244,8 +244,6 @@ public class SimpleDynamoProvider extends ContentProvider {
 					port = successorMap.get(port);
 					// Log.d(TAG, "calling succ: " + port + " to getMissedInsert from:" + myPort);
 					new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "getMissedInsert", port, myPort);
-
-
 				}
 				return true;
 			}
@@ -448,37 +446,84 @@ public class SimpleDynamoProvider extends ContentProvider {
 					Log.d(TAG, "query cursor myPort.equals" +
 							"(portToStoreKey) ");
 					Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
-						cursor.moveToFirst();
-						Log.d(TAG,"cursor qKEY " + cursor.getString(0));
-						Log.d(TAG,"cursor qVALUE "+ cursor.getString(1));
-				} else {
+					cursor.moveToFirst();
+					Log.d(TAG, "cursor qKEY " + cursor.getString(0));
+					Log.d(TAG, "cursor qVALUE " + cursor.getString(1));
+					cursor.moveToFirst();
+				}
+//				} else {
 					// TODO
 					//HERERERERERERERERRERERER CHECK IF KEY IS REPLICATED LOCALLY
 					// OR JUST QUERY LOCAL, IF NOT FOUND THEN SEARCH THE RING
 					Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
-					while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
+//					while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
 //					while (cursor == null || cursor.getCount() <= 0) {
-						try {
-							cursor = actSynchronously("search", portToStoreKey, selectionArgss[0], originatorPort);
-							Log.d(TAG, "query cursor myPort Not equals" +
-									"(portToStoreKey) ");
-							dummyCursor = cursor;
-							Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+
+
+//				int LOOP = 3;
+				String port = portToStoreKey;
+
+//				if (myPort.equals(port)) {
+//					LOOP = 2;
+//					port = successorMap.get(port);
+//					Log.d(TAG, "query calling succ: " + port + " to " + "actSynchronously search from SAME PORT:" + myPort);
+//				}
+//				for (int i = 0; i < LOOP; i++) {
+
+//				if (cursor.getCount() > 0) {
+//					port = myPort;
+//				}
+
+				if (((cursor != null && cursor.getCount() <= 0) || cursor == null) && !myPort.equals(originatorPort)) {
+					return cursor;
+				}
+
+				if (portToStoreKey.equals(myPort) || cursor.getCount() > 0) {
+					Log.d(TAG, "(portToStoreKey.equals(myPort) || cursor" +
+							".getCount() > 0)");
+					port = successorMap.get(myPort);
+				} else if (portToStoreKey.equals(originatorPort)) {
+					Log.d(TAG, "continuing in query coz port.equals" +
+							"(originatorPort)");
+//						continue;
+					port = successorMap.get(portToStoreKey);
+				}
+
+				if (port.equals(originatorPort)) {
+					return cursor;
+				}
+
+
+					Log.d(TAG, "query calling succ: " + port + " to " +
+							"actSynchronously search from: " + myPort);
+
+					try {
+						Cursor cursorReturned = null;
+						cursorReturned = actSynchronously("search",
+								port, selectionArgss[0], originatorPort);
+						Log.d(TAG, "query cursor myPort Not equals " +
+								"portToStoreKey): " + portToStoreKey);
+						dummyCursor = cursorReturned;
+						Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
 
 //							while (cursor.getCount() <= 0) {
 //								portToStoreKey = successorMap.get(portToStoreKey);
 //								cursor = actSynchronously("search", portToStoreKey, selectionArgss[0], originatorPort);
 //							}
+						if (cursorReturned != null && cursorReturned.getCount() >= 1) {
+							cursor = cursorReturned;
+						}
 //					cursor.moveToFirst();
-						} catch (Exception e) {
-							Log.e(TAG, "first call to actSynchronously: " + myPort);
-							e.printStackTrace();
+					} catch (Exception e) {
+						Log.e(TAG, "first call to actSynchronously: " + myPort);
+						e.printStackTrace();
 //							portToStoreKey = successorMap.get(portToStoreKey);
 //							continue;
-						}
-						portToStoreKey = successorMap.get(portToStoreKey);
 					}
-				}
+
+//					port = successorMap.get(port);
+//				}
+//				}
 			} catch (Exception e) {
 				Log.e(TAG, "querying else " + e.toString());
 				e.printStackTrace();
