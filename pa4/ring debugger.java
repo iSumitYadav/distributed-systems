@@ -25,8 +25,14 @@ public class HelloWorld{
             String n3 = genHash("5560");
             System.out.println(n3);
             
+            // System.out.println("z4D4OSnQEVhYFHRV0k9SIvFRRtRxERjA-1588036588974");
+            // String[] arr = "z4D4OSnQEVhYFHRV0k9SIvFRRtRxERjA-1588036588974".split("-");
+            // System.out.println(arr[0]);
+            // System.out.println(arr[1]);
+            
+            // System.out.println(Long.toString(System.currentTimeMillis()));
             System.out.println("======================checker");
-            String hashedkey = genHash("DG0VH76EWKr6hInXIlifbF68KrCsVfbX");
+            String hashedkey = genHash("9nps8Re4fi5IeG4YAVQxCn1HdHfyjOsg");
             System.out.println(hashedkey);
             
             System.out.println(hashedkey.compareTo(n4));
