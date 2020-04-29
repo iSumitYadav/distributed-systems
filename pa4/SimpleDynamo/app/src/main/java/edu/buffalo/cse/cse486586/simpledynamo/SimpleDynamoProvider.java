@@ -399,8 +399,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 			Log.d(TAG, "score INSERTION BEING DONE FOR KEY: " + selection);
 		}
 
+		boolean ORIGIN = false;
 		String originatorPort = myPort;
 		if (selectionArgs!= null && selectionArgs.length >= 1 && selectionArgs[0] != null) {
+			ORIGIN = true;
 			originatorPort = selectionArgs[0];
 		}
 		Log.d(TAG, "qKEY selection:" + selection + " myPort: "+ myPort + " " + "originatorPort: " + originatorPort);
@@ -922,7 +924,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //			}
 		}
 
-		if (!selection.equals("LDump") && myPort.equals(originatorPort)) {
+		if (!selection.equals("LDump") && myPort.equals(originatorPort) && ORIGIN == true) {
 			MatrixCursor matrixCursor = new MatrixCursor(new String[]{COLUMN_NAME_KEY, COLUMN_NAME_VALUE});
 
 			cursor.moveToFirst();
