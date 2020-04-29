@@ -194,8 +194,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 		} else {
 			// Log.d(TAG, "INSERTION myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + originalKey);
-			new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", portToStoreKey, originalKey, (String) values.get("value"));
-//			actSynchronously("insert", portToStoreKey, originalKey, (String) values.get("value"));
+//			new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", portToStoreKey, originalKey, (String) values.get("value"));
+			actSynchronously("insert", portToStoreKey, originalKey, (String) values.get("value"));
 		}
 		INSERTION = false;
 
@@ -949,7 +949,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 				Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(portToConnect));
 				socket.setSoTimeout(100);
 
-				
+
 				messageStruct msgStruct = new messageStruct(
 						msgType,
 						originatorPort,
