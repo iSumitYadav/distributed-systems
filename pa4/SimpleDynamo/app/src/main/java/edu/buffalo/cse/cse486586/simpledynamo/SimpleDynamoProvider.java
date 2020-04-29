@@ -399,10 +399,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 			Log.d(TAG, "score INSERTION BEING DONE FOR KEY: " + selection);
 		}
 
-		boolean ORIGIN = false;
+		boolean ORIGIN = true;
 		String originatorPort = myPort;
 		if (selectionArgs!= null && selectionArgs.length >= 1 && selectionArgs[0] != null) {
-			ORIGIN = true;
+			ORIGIN = false;
 			originatorPort = selectionArgs[0];
 		}
 		Log.d(TAG, "qKEY selection:" + selection + " myPort: "+ myPort + " " + "originatorPort: " + originatorPort);
