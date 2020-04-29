@@ -107,7 +107,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 		}
 
 		String portToStoreKey = getNodeToStoreKey(hashedKey);
-		String time = Long.toString(System.currentTimeMillis());
+//		String time = Long.toString(System.currentTimeMillis());
 
 		 Log.d(TAG, "INSERTION " + myPort + " key: " + originalKey + " value:" +(String) values.get("value"));
 		if (myPort.equals(portToStoreKey)) {
@@ -118,7 +118,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 			newValues.put(SimpleDynamoProvider.COLUMN_NAME_VALUE, (String) values.get("value"));
 			newValues.put("type", "insertion");
 			newValues.put("port", myPort);
-			newValues.put("time", time);
+//			newValues.put("time", time);
 
 //			Cursor cursor = db.query(
 //				TABLE_NAME,
@@ -171,9 +171,11 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 			cursor.moveToFirst();
 			if (cursor.getCount() > 0) {
+//				if (time != null && time.compareTo(cursor.getString(4)) > 0) {
 				db.delete(TABLE_NAME, "key=?", new String[]{originalKey});
 			}
 			newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, originalKey);
+			newValues.put("time", Long.toString(System.currentTimeMillis()));
 			db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_REPLACE);
 
 //			db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_IGNORE);
@@ -186,7 +188,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 				new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR,
 						"replication", port, originalKey,
-						(String) values.get("value"), myPort, time);
+						(String) values.get("value"), myPort, Long.toString(System.currentTimeMillis()));
 //				actSynchronously("replication", port, originalKey, (String) values.get("value"), myPort);
 			}
 
@@ -811,7 +813,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 								}
 
 								dummyCursor = cursor;
-								Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+								Log.d(TAG,
+										"dumpcursor 817: "+DatabaseUtils.dumpCursorToString(dummyCursor));
 
 
 
@@ -944,6 +947,9 @@ public class SimpleDynamoProvider extends ContentProvider {
 			try {
 				Log.d(TAG, "actSynchronously Start for msgType:" + msgType + " " + "portToConnect: " + portToConnect + " key: " + key + " originatorPort:" + originatorPort);
 				Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(portToConnect));
+				socket.setSoTimeout(100);
+
+				
 				messageStruct msgStruct = new messageStruct(
 						msgType,
 						originatorPort,
@@ -1019,7 +1025,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 							" ASYNC MSG 1");
 			try {
 				Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
-				socket.setSoTimeout(250);
+				socket.setSoTimeout(100);
 
 				Log.d(TAG, msgType + " ClienTask for key: " + _key + " " +
 						"myPort: " + myPort + " sent to: " + nxtSuccessor +
@@ -1148,7 +1154,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 				Log.d(TAG, msgType + " ClienTask for key: " + key + " myPort: " + myPort + " sent to: " + nxtSuccessor);
 				try {
 					Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
-					socket.setSoTimeout(250);
+					socket.setSoTimeout(100);
 
 					Log.d(TAG, msgType + " ClienTask for key: " + key + " " + "myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG");
 					messageStruct msgStruct;
