@@ -192,8 +192,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 		} else {
 			// Log.d(TAG, "INSERTION myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + originalKey);
-			new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", portToStoreKey, originalKey, (String) values.get("value"));
-//			actSynchronously("insert", portToStoreKey, originalKey, (String) values.get("value"));
+//			new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", portToStoreKey, originalKey, (String) values.get("value"));
+			actSynchronously("insert", portToStoreKey, originalKey, (String) values.get("value"));
 		}
 		INSERTION = false;
 
@@ -1148,7 +1148,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 				Log.d(TAG, msgType + " ClienTask for key: " + key + " myPort: " + myPort + " sent to: " + nxtSuccessor);
 				try {
 					Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
-					socket.setSoTimeout(100);
+					socket.setSoTimeout(250);
 
 					Log.d(TAG, msgType + " ClienTask for key: " + key + " " + "myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG");
 					messageStruct msgStruct;
