@@ -109,7 +109,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 		String portToStoreKey = getNodeToStoreKey(hashedKey);
 		String time = Long.toString(System.currentTimeMillis());
 
-		// Log.d(TAG, "INSERTION " + myPort + " " + originalKey);
+		 Log.d(TAG, "INSERTION " + myPort + " key: " + originalKey + " value:" +(String) values.get("value"));
 		if (myPort.equals(portToStoreKey)) {
 			// Log.d(TAG, "INSERTION myPort.equals(portToStoreKey) " + myPort + " " + originalKey);
 			ContentValues newValues = new ContentValues();
@@ -253,6 +253,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 //					db.update(TABLE_NAME, newValues, COLUMN_NAME_KEY + "=?", new String[]{key});
 					db.delete(TABLE_NAME, "key=?", new String[]{key});
 					newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, key);
+					newValues.remove("time");
+					newValues.put("time", time);
 					db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_REPLACE);
 				}
 			}
@@ -406,6 +408,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 			projection = new String[]{COLUMN_NAME_KEY, COLUMN_NAME_VALUE};
 //		}
 
+		sortOrder = "time DESC";
 
 		Log.d(TAG, "replicate query insertion 1");
 		Log.d(TAG, "QUERY GLOBAL myPort: " + myPort + ", succ: "+ successor + ", pred: "+predecessor);
@@ -609,7 +612,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 			try {
 //				if (cursor.getCount() > 0 && myPort.equals(portToStoreKey)) {
 				if (myPort.equals(portToStoreKey)) {
-					while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
+//					while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
 						cursor = db.query(
 								TABLE_NAME,
 								projection,
@@ -620,8 +623,96 @@ public class SimpleDynamoProvider extends ContentProvider {
 								sortOrder,
 								"1"
 						);
+
+//					}
+
+					String port = portToStoreKey;
+					Cursor cursor1 = null;
+					Cursor cursor2 = null;
+
+					try {
+						port = successorMap.get(port);
+						cursor1 = actSynchronously("search", port, originatorPort, selectionArgss[0]);
+					} catch (Exception e) {
+						Log.d(TAG, "cursor1 is null maybe");
+						Log.e(TAG, "query myPort.equals(portToStoreKey) first" +
+								" succ: " + port + " key: "+selectionArgss[0] + " originatorPort:"+originatorPort +" err: "+ e.toString());
 					}
-					dummyCursor = cursor;
+
+					try {
+						port = successorMap.get(port);
+						cursor2 = actSynchronously("search", port, originatorPort, selectionArgss[0]);
+					} catch (Exception e) {
+						Log.d(TAG, "cursor2 is null maybe");
+						Log.e(TAG, "query myPort.equals(portToStoreKey) " +
+								"second" +
+								" succ: " + port + " key: "+selectionArgss[0] + " originatorPort:"+originatorPort +" err: "+ e.toString());
+					}
+
+					String time = null;
+					String time1 = null;
+					String time2 = null;
+
+					if (cursor != null && cursor.getCount() > 0) {
+						time = cursor.getString(4);
+					}
+
+					if (cursor1 != null && cursor1.getCount() > 0) {
+						time1 = cursor1.getString(4);
+					}
+
+					if (cursor2 != null && cursor2.getCount() > 0) {
+						time2 = cursor2.getString(4);
+					}
+
+					if (time != null) {
+						if (time1 != null && time1.compareTo(time) > 0) {
+							cursor = cursor1;
+						}
+
+						if (time2 != null && time2.compareTo(time) > 0) {
+							cursor = cursor2;
+						}
+					} else {
+						if (time1 != null && time2 != null && time1.compareTo(time2) > 0) {
+							cursor = cursor1;
+						} else if (time1 != null) {
+							cursor = cursor1;
+						} else {
+							cursor = cursor2;
+						}
+					}
+
+//					if (cursor != null && cursor.getCount() > 0) {
+//						if (cursor1 != null && cursor1.getCount() > 0) {
+//							String time = cursor.getString(4);
+//							String time1 = cursor1.getString(4);
+//
+//							if (time.compareTo(time1) < 0) {
+//								cursor = cursor1;
+//							}
+//						}
+//
+//						if (cursor2 != null && cursor2.getCount() > 0) {
+//							String time = cursor.getString(4);
+//							String time2 = cursor2.getString(4);
+//
+//							if (time.compareTo(time2) < 0) {
+//								cursor = cursor2;
+//							}
+//						}
+//					} else {
+//						if (cursor1 != null && cursor1.getCount() > 0) {
+//							String time = cursor.getString(4);
+//							String time1 = cursor1.getString(4);
+//
+//							if (time.compareTo(time1) < 0) {
+//								cursor = cursor1;
+//							}
+//						}
+//					}
+
+//					dummyCursor = cursor;
 					Log.d(TAG, "query cursor myPort.equals (portToStoreKey) ");
 					Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
 					cursor.moveToFirst();
@@ -638,8 +729,41 @@ public class SimpleDynamoProvider extends ContentProvider {
 					//HERERERERERERERERRERERER CHECK IF KEY IS REPLICATED LOCALLY
 					// OR JUST QUERY LOCAL, IF NOT FOUND THEN SEARCH THE RING
 					Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
+
+
+
+
+
+
+
+
+					//	GET ALL VALUES AND RETURN THE VALUE WITH MOST RECENT TIMESTAMP
+
+//					if (cursor.getCount() > 0) {
+//
+//					}
+//
+//					String port = portToStoreKey;
+//					for(int i=0; i<3; i++) {
+//						if (port.equals(originatorPort) || ) {
+//							continue;
+//						}
+//
+//
+//					}
+
+
+
+
+
+
+
+
 					while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
 						String port = portToStoreKey;
+
+//						Cursor cursor2 = null;
+//						Cursor cursor3 = null;
 
 						while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
 //					while (cursor == null || cursor.getCount() <= 0) {
@@ -648,6 +772,31 @@ public class SimpleDynamoProvider extends ContentProvider {
 								Log.d(TAG, "query cursor myPort Not equals (portToStoreKey) ");
 								dummyCursor = cursor;
 								Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 //							while (cursor.getCount() <= 0) {
 //								portToStoreKey = successorMap.get(portToStoreKey);
@@ -1078,7 +1227,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 							String[] value_time = v.split("-");
 							Log.d(TAG,
-									"printing | k: "+k+" v: "+value_time[0] + " t: "+value_time[1] + " oV:"+v);
+									msgType+" printing | k: "+k+" v: "+value_time[0] + " t: "+value_time[1] + " oV:"+v);
 
 							insertReplication(CONTENT_URI, k,
 									value_time[0], values_type,
@@ -1241,7 +1390,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 							while(!cursor.isAfterLast()) {
 								k = cursor.getString(0);
 								v = cursor.getString(1)+"-"+cursor.getString(4);
-								Log.d(TAG, "printing | k: "+k+" v: "+v);
+								Log.d(TAG, msgPlusPortObject.msg + " printing | " + "k: "+k+" v: "+v);
 								cursorKeyValueMap.put(k, v);
 								cursor.moveToNext();
 							}
