@@ -48,6 +48,7 @@ public class SimpleDynamoActivity extends Activity {
 			null
 		);
 
+		int i = 0;
 		try {
 			if (resultCursor.moveToFirst()) {
 				while (!resultCursor.isAfterLast()) {
@@ -57,9 +58,12 @@ public class SimpleDynamoActivity extends Activity {
 					String port = resultCursor.getString(3);
 					String time = resultCursor.getString(4);
 
-					tv.append("KEY: " + key + " \n VALUE: " + value + " \n " +
+					tv.append(i + " KEY: " + key + " \n VALUE: " + value + " " +
+							"\n" +
+							" " +
 							"TYPE: " + type + " \n PORT: "+ port + " \n TIME:" +
 							" " + time + "\n\n\n");
+					i++;
 
 					resultCursor.moveToNext();
 				}
