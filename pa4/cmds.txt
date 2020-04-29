@@ -36,3 +36,11 @@ Testing concurrency, one consistent failure
 
 ./simpledynamo-grading.osx SimpleDynamo/app/build/outputs/apk/debug/app-debug.apk
 THIS SHOULD BE FULLY WORKING WITH 23% BEFORE SUBMITTING
+
+
+
+
+
+
+
+CursorIndexOutOfBoundsException

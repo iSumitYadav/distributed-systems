@@ -405,7 +405,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 
 //		if (myPort.equals(originatorPort)) {
-			projection = new String[]{COLUMN_NAME_KEY, COLUMN_NAME_VALUE};
+//			projection = new String[]{COLUMN_NAME_KEY, COLUMN_NAME_VALUE};
 //		}
 
 		sortOrder = "time DESC";
@@ -589,7 +589,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 			cursor = db.query(
 					TABLE_NAME,
-					projection,
+					null,
 					selection,
 					selectionArgss,
 					null,
@@ -615,7 +615,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //					while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
 						cursor = db.query(
 								TABLE_NAME,
-								projection,
+								null,
 								selection,
 								selectionArgss,
 								null,
@@ -623,12 +623,13 @@ public class SimpleDynamoProvider extends ContentProvider {
 								sortOrder,
 								"1"
 						);
-
 //					}
 
 					String port = portToStoreKey;
 					Cursor cursor1 = null;
 					Cursor cursor2 = null;
+
+
 
 					try {
 						port = successorMap.get(port);
@@ -653,16 +654,39 @@ public class SimpleDynamoProvider extends ContentProvider {
 					String time1 = null;
 					String time2 = null;
 
+
+
 					if (cursor != null && cursor.getCount() > 0) {
+						dummyCursor = cursor;
+						Log.d(TAG, "dumping time cursor: " + DatabaseUtils.dumpCursorToString(dummyCursor));
+
+						cursor.moveToFirst();
 						time = cursor.getString(4);
+
+//						MatrixCursor matrixCursor = new MatrixCursor(new String[]{COLUMN_NAME_KEY, COLUMN_NAME_VALUE});
+//						MatrixCursor.RowBuilder newRow = matrixCursor.newRow();
+//						newRow.add(cursor.getString(0));
+//						newRow.add(cursor.getString(1));
+//
+//						cursor = matrixCursor;
 					}
 
-					if (cursor1 != null && cursor1.getCount() > 0) {
-						time1 = cursor1.getString(4);
+					try {
+						if (cursor1 != null && cursor1.getCount() > 0) {
+							cursor1.moveToFirst();
+							time1 = cursor1.getString(4);
+						}
+					} catch (Exception e) {
+						Log.e(TAG, "cursor1 is broken: "+e.toString());
 					}
 
-					if (cursor2 != null && cursor2.getCount() > 0) {
-						time2 = cursor2.getString(4);
+					try {
+						if (cursor2 != null && cursor2.getCount() > 0) {
+							cursor2.moveToFirst();
+							time2 = cursor2.getString(4);
+						}
+					} catch (Exception e) {
+						Log.e(TAG, "cursor2 is broken: "+e.toString());
 					}
 
 					if (time != null) {
@@ -712,7 +736,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //						}
 //					}
 
-//					dummyCursor = cursor;
+					dummyCursor = cursor;
 					Log.d(TAG, "query cursor myPort.equals (portToStoreKey) ");
 					Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
 					cursor.moveToFirst();
@@ -879,6 +903,23 @@ public class SimpleDynamoProvider extends ContentProvider {
 //			}
 		}
 
+		if (myPort.equals(originatorPort)) {
+			MatrixCursor matrixCursor = new MatrixCursor(new String[]{COLUMN_NAME_KEY, COLUMN_NAME_VALUE});
+
+			cursor.moveToFirst();
+			while(!cursor.isAfterLast()) {
+				MatrixCursor.RowBuilder newRow = matrixCursor.newRow();
+
+//				cursor.moveToFirst();
+				newRow.add(cursor.getString(0));
+				newRow.add(cursor.getString(1));
+
+				cursor.moveToNext();
+			}
+
+			cursor = matrixCursor;
+		}
+
 		return cursor;
 	}
 
@@ -919,11 +960,21 @@ public class SimpleDynamoProvider extends ContentProvider {
 				} else {
 					Map<String, String> cursorKeyValueMap = ack.keyValueMap;
 
+					matrixCursor = new MatrixCursor(new String[]{COLUMN_NAME_KEY, COLUMN_NAME_VALUE, "type", "port", "time"});
+
 					if (cursorKeyValueMap != null && !cursorKeyValueMap.isEmpty()) {
 						for (Map.Entry<String, String> entry : cursorKeyValueMap.entrySet()) {
 							MatrixCursor.RowBuilder newRow = matrixCursor.newRow();
 							newRow.add(entry.getKey());
-							newRow.add(entry.getValue());
+
+							String val = entry.getValue();
+
+							String[] value_type_port_time = val.split("-");
+//							newRow.add(entry.getValue());
+							newRow.add(value_type_port_time[0]);
+							newRow.add(value_type_port_time[1]);
+							newRow.add(value_type_port_time[2]);
+							newRow.add(value_type_port_time[3]);
 						}
 					}
 
@@ -1359,7 +1410,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 								Map<String, String> cursorKeyValueMap = new HashMap<String, String>();
 								while(!cursor.isAfterLast()) {
-									cursorKeyValueMap.put(cursor.getString(0), cursor.getString(1));
+									String val = cursor.getString(1) + "-" + cursor.getString(2) + "-" + cursor.getString(3) + "-" + cursor.getString(4);
+									cursorKeyValueMap.put(cursor.getString(0), val);
 									cursor.moveToNext();
 								}
 								msgPlusPortObject.keyValueMap = cursorKeyValueMap;
