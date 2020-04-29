@@ -582,6 +582,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 			while(INSERTION) {
 				Log.d(TAG, "score 3 "+selection+" BEING DONE FOR KEY: " + selectionArgss[0]);
 			}
+
+
 			cursor = db.query(
 					TABLE_NAME,
 					projection,
@@ -605,12 +607,26 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 				Log.d(TAG, "qKEY " + selectionArgss[0]);
 			try {
-				if (cursor.getCount() > 0 && myPort.equals(portToStoreKey)) {
+//				if (cursor.getCount() > 0 && myPort.equals(portToStoreKey)) {
+				if (myPort.equals(portToStoreKey)) {
+					while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
+						cursor = db.query(
+								TABLE_NAME,
+								projection,
+								selection,
+								selectionArgss,
+								null,
+								null,
+								sortOrder,
+								"1"
+						);
+					}
+					dummyCursor = cursor;
 					Log.d(TAG, "query cursor myPort.equals (portToStoreKey) ");
 					Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
-						cursor.moveToFirst();
-						Log.d(TAG,"cursor qKEY " + cursor.getString(0));
-						Log.d(TAG,"cursor qVALUE "+ cursor.getString(1));
+					cursor.moveToFirst();
+					Log.d(TAG,"cursor qKEY " + cursor.getString(0));
+					Log.d(TAG,"cursor qVALUE "+ cursor.getString(1));
 				}else {
 //					if (!myPort.equals(portToStoreKey) && !portToStoreKey.equals(originatorPort)) {
 //						// TODO
@@ -623,10 +639,12 @@ public class SimpleDynamoProvider extends ContentProvider {
 					// OR JUST QUERY LOCAL, IF NOT FOUND THEN SEARCH THE RING
 					Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
 					while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
+						String port = portToStoreKey;
+
 						while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
 //					while (cursor == null || cursor.getCount() <= 0) {
 							try {
-								cursor = actSynchronously("search", portToStoreKey, originatorPort, selectionArgss[0]);
+								cursor = actSynchronously("search", port, originatorPort, selectionArgss[0]);
 								Log.d(TAG, "query cursor myPort Not equals (portToStoreKey) ");
 								dummyCursor = cursor;
 								Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
@@ -642,7 +660,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //							portToStoreKey = successorMap.get(portToStoreKey);
 //							continue;
 							}
-							portToStoreKey = successorMap.get(portToStoreKey);
+							port = successorMap.get(port);
 						}
 					}
 				}
@@ -781,13 +799,15 @@ public class SimpleDynamoProvider extends ContentProvider {
 			String value = key;
 
 			Log.d(TAG,
-					msgType + " ClienTask for key: " + _key + " myPort: " + myPort + " sent to: " + nxtSuccessor);
+					msgType + " ClienTask for key: " + _key + " myPort: " + myPort + " sent to: " + nxtSuccessor +
+							" ASYNC MSG 1");
 			try {
 				Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
 				socket.setSoTimeout(100);
 
 				Log.d(TAG, msgType + " ClienTask for key: " + _key + " " +
-						"myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG");
+						"myPort: " + myPort + " sent to: " + nxtSuccessor +
+						" ASYNC MSG 2");
 				messageStruct msgStruct;
 //				if (msgType.equals("replication")) {
 //					msgStruct = new messageStruct(
