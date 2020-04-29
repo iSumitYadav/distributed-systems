@@ -413,7 +413,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 		Log.d(TAG, "replicate query insertion 1");
 		Log.d(TAG, "QUERY GLOBAL myPort: " + myPort + ", succ: "+ successor + ", pred: "+predecessor);
 
-		if (selection.equals("@")) {
+		if (selection.equals("@") || selection.equals("LDump")) {
 			cursor = db.query(
 				TABLE_NAME,
 				projection,
@@ -424,7 +424,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 				sortOrder,
 				null
 			);
-			Log.d(TAG, "query: @");
+			Log.d(TAG, "query: " + selection);
 			dummyCursor = db.query(
 					TABLE_NAME,
 					null,
@@ -632,8 +632,11 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 
 					try {
+						Log.d(TAG, "cursor 1");
 						port = successorMap.get(port);
-						cursor1 = actSynchronously("search", port, originatorPort, selectionArgss[0]);
+						if (!port.equals(originatorPort)) {
+							cursor1 = actSynchronously("search", port, originatorPort, selectionArgss[0]);
+						}
 					} catch (Exception e) {
 						Log.d(TAG, "cursor1 is null maybe");
 						Log.e(TAG, "query myPort.equals(portToStoreKey) first" +
@@ -641,8 +644,11 @@ public class SimpleDynamoProvider extends ContentProvider {
 					}
 
 					try {
+						Log.d(TAG, "cursor 2");
 						port = successorMap.get(port);
-						cursor2 = actSynchronously("search", port, originatorPort, selectionArgss[0]);
+						if (!port.equals(originatorPort)) {
+							cursor2 = actSynchronously("search", port, originatorPort, selectionArgss[0]);
+						}
 					} catch (Exception e) {
 						Log.d(TAG, "cursor2 is null maybe");
 						Log.e(TAG, "query myPort.equals(portToStoreKey) " +
@@ -673,6 +679,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 					try {
 						if (cursor1 != null && cursor1.getCount() > 0) {
+							Log.d(TAG, "cursor1 != null && cursor1.getCount() > 0");
 							cursor1.moveToFirst();
 							time1 = cursor1.getString(4);
 						}
@@ -682,6 +689,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 					try {
 						if (cursor2 != null && cursor2.getCount() > 0) {
+							Log.d(TAG, "cursor2 != null && cursor2.getCount() > 0");
 							cursor2.moveToFirst();
 							time2 = cursor2.getString(4);
 						}
@@ -691,18 +699,23 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 					if (time != null) {
 						if (time1 != null && time1.compareTo(time) > 0) {
+							Log.d(TAG, "time1 != null && time1.compareTo(time) > 0");
 							cursor = cursor1;
 						}
 
 						if (time2 != null && time2.compareTo(time) > 0) {
+							Log.d(TAG, "time2 != null && time2.compareTo(time) > 0");
 							cursor = cursor2;
 						}
 					} else {
 						if (time1 != null && time2 != null && time1.compareTo(time2) > 0) {
+							Log.d(TAG, "time1 != null && time2 != null && time1.compareTo(time2) > 0");
 							cursor = cursor1;
 						} else if (time1 != null) {
+							Log.d(TAG, "time1 != null");
 							cursor = cursor1;
 						} else {
+							Log.d(TAG, "time1 == null && time2 == null");
 							cursor = cursor2;
 						}
 					}
@@ -742,7 +755,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 					cursor.moveToFirst();
 					Log.d(TAG,"cursor qKEY " + cursor.getString(0));
 					Log.d(TAG,"cursor qVALUE "+ cursor.getString(1));
-				}else {
+				} else {
 //					if (!myPort.equals(portToStoreKey) && !portToStoreKey.equals(originatorPort)) {
 //						// TODO
 //						//HERERERERERERERERRERERER CHECK IF KEY IS REPLICATED LOCALLY
@@ -792,8 +805,11 @@ public class SimpleDynamoProvider extends ContentProvider {
 						while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
 //					while (cursor == null || cursor.getCount() <= 0) {
 							try {
-								cursor = actSynchronously("search", port, originatorPort, selectionArgss[0]);
 								Log.d(TAG, "query cursor myPort Not equals (portToStoreKey) ");
+								if (!port.equals(originatorPort)) {
+									cursor = actSynchronously("search", port, originatorPort, selectionArgss[0]);
+								}
+
 								dummyCursor = cursor;
 								Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
 
@@ -903,7 +919,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //			}
 		}
 
-		if (myPort.equals(originatorPort)) {
+		if (!selection.equals("LDump") && myPort.equals(originatorPort)) {
 			MatrixCursor matrixCursor = new MatrixCursor(new String[]{COLUMN_NAME_KEY, COLUMN_NAME_VALUE});
 
 			cursor.moveToFirst();
@@ -1003,7 +1019,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 							" ASYNC MSG 1");
 			try {
 				Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
-				socket.setSoTimeout(100);
+				socket.setSoTimeout(250);
 
 				Log.d(TAG, msgType + " ClienTask for key: " + _key + " " +
 						"myPort: " + myPort + " sent to: " + nxtSuccessor +
@@ -1376,28 +1392,28 @@ public class SimpleDynamoProvider extends ContentProvider {
 							} catch (NoSuchAlgorithmException e) {
 								Log.e(TAG, "CP query " + e.toString());
 							}
-							if (predecessor == null || (myPortHash.compareTo(hashKey) >= 0 && hashKey.compareTo(predecessorHash) > 0)) {
-								cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
-							} else if (predecessor == successor) {
-								if (hashKey.compareTo(myPortHash) <= 0 && hashKey.compareTo(successorHash) < 0) {
-									cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
-								} else if (hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) < 0) {
-									Log.d(TAG, "hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) < 0");
-									cursor = actSynchronously("search", successor, msgPlusPortObject.originatorPort, msgPlusPortObject.key);
-								} else if (hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) > 0) {
-									cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
-								}
-							} else if (myPortHash.compareTo(hashKey) >= 0 && hashKey.compareTo(predecessorHash) > 0) {
-								cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
-							} else if (myPortHash.compareTo(hashKey) < 0 && predecessorHash.compareTo(hashKey) < 0 && successorHash.compareTo(hashKey) < 0 && myPortHash.compareTo(predecessorHash) < 0) {
-								cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
-							} else if (myPortHash.compareTo(hashKey) > 0 && predecessorHash.compareTo(hashKey) > 0 && successorHash.compareTo(hashKey) > 0 && myPortHash.compareTo(predecessorHash) < 0) {
-								cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
-							} else {
+//							if (predecessor == null || (myPortHash.compareTo(hashKey) >= 0 && hashKey.compareTo(predecessorHash) > 0)) {
+//								cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
+//							} else if (predecessor == successor) {
+//								if (hashKey.compareTo(myPortHash) <= 0 && hashKey.compareTo(successorHash) < 0) {
+//									cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
+//								} else if (hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) < 0) {
+//									Log.d(TAG, "hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) < 0");
+//									cursor = actSynchronously("search", successor, msgPlusPortObject.originatorPort, msgPlusPortObject.key);
+//								} else if (hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) > 0) {
+//									cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
+//								}
+//							} else if (myPortHash.compareTo(hashKey) >= 0 && hashKey.compareTo(predecessorHash) > 0) {
+//								cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
+//							} else if (myPortHash.compareTo(hashKey) < 0 && predecessorHash.compareTo(hashKey) < 0 && successorHash.compareTo(hashKey) < 0 && myPortHash.compareTo(predecessorHash) < 0) {
+//								cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
+//							} else if (myPortHash.compareTo(hashKey) > 0 && predecessorHash.compareTo(hashKey) > 0 && successorHash.compareTo(hashKey) > 0 && myPortHash.compareTo(predecessorHash) < 0) {
+//								cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
+//							} else {
 								Log.d(TAG, "else in server search");
 								cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
 //								cursor = actSynchronously("search", successor, msgPlusPortObject.originatorPort, msgPlusPortObject.key);
-							}
+//							}
 							if (cursor.getCount() > 0) {
 								cursor.moveToFirst();
 								msgPlusPortObject.value = cursor.getString(1);

@@ -22,7 +22,7 @@ public class SimpleDynamoActivity extends Activity {
 		final Button LDump = (Button) findViewById(R.id.button1);
 		LDump.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
-				getDataFromCP("@");
+				getDataFromCP("LDump");
 			}
 		});
 
@@ -50,11 +50,18 @@ public class SimpleDynamoActivity extends Activity {
 
 		try {
 			if (resultCursor.moveToFirst()) {
-				while (resultCursor.moveToNext()) {
+				while (!resultCursor.isAfterLast()) {
 					String key = resultCursor.getString(0);
 					String value = resultCursor.getString(1);
+					String type = resultCursor.getString(2);
+					String port = resultCursor.getString(3);
+					String time = resultCursor.getString(4);
 
-					tv.append(key + ": " + value + "\n\n");
+					tv.append("KEY: " + key + " \n VALUE: " + value + " \n " +
+							"TYPE: " + type + " \n PORT: "+ port + " \n TIME:" +
+							" " + time + "\n\n\n");
+
+					resultCursor.moveToNext();
 				}
 			}
 		} catch (Exception e) {

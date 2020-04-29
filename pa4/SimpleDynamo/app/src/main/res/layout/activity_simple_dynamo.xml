@@ -39,6 +39,7 @@
         android:layout_height="wrap_content"
         android:layout_alignParentLeft="true"
         android:layout_alignParentRight="true"
+        android:textIsSelectable="true"
         android:layout_below="@+id/button1"
         android:fadeScrollbars="true"
         android:gravity="bottom"
