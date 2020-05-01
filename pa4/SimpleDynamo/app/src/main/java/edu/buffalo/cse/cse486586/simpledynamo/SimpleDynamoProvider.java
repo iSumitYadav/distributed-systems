@@ -230,11 +230,11 @@ public class SimpleDynamoProvider extends ContentProvider {
 			if (myPort.equals(succ1)) {
 				new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR,
 						"replication", succ2, originalKey,
-						(String) values.get("value"), myPort, time);
+						(String) values.get("value"), portToStoreKey, time);
 			} else {
 				new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR,
 						"replication", succ1, originalKey,
-						(String) values.get("value"), myPort, time);
+						(String) values.get("value"), portToStoreKey, time);
 			}
 		} else {
 			// Log.d(TAG, "INSERTION myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + originalKey);
@@ -319,6 +319,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 			db.delete(TABLE_NAME, "key=?", new String[]{key});
 			newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, key);
 			db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_REPLACE);
+			Log.d(TAG, "timetime insertReplication cursor is null: " + time);
 		}
 
 //		int updated = db.update(TABLE_NAME, newValues, COLUMN_NAME_KEY+"=?", new String[]{key});
