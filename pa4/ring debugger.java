@@ -25,21 +25,24 @@ public class HelloWorld{
             String n3 = genHash("5560");
             System.out.println(n3);
             
-            // System.out.println("z4D4OSnQEVhYFHRV0k9SIvFRRtRxERjA-1588036588974");
-            // String[] arr = "z4D4OSnQEVhYFHRV0k9SIvFRRtRxERjA-1588036588974".split("-");
-            // System.out.println(arr[0]);
-            // System.out.println(arr[1]);
+            String strr = "z4D4OSnQEVhYFHRV0k9SIvFRRtRxERjA-insertion-11108-1588036588974";
+            System.out.println(strr);
+            String[] arr = strr.split("-");
+            System.out.println(arr[0]);
+            System.out.println(arr[1]);
+            System.out.println(arr[2]);
+            System.out.println(arr[3]);
             
             // System.out.println(Long.toString(System.currentTimeMillis()));
             System.out.println("======================checker");
-            String hashedkey = genHash("9nps8Re4fi5IeG4YAVQxCn1HdHfyjOsg");
+            String hashedkey = genHash("Zmpcev7TqcTiIHXduIlDSloPcxzRSNvD");
             System.out.println(hashedkey);
             
-            System.out.println(hashedkey.compareTo(n4));
-            System.out.println(hashedkey.compareTo(n1));
-            System.out.println(hashedkey.compareTo(n0));
-            System.out.println(hashedkey.compareTo(n2));
-            System.out.println(hashedkey.compareTo(n3));
+            System.out.println(hashedkey.compareTo(n4) + " - 5562 - 11124 - avd4");
+            System.out.println(hashedkey.compareTo(n1) + " - 5556 - 11112 - avd1");
+            System.out.println(hashedkey.compareTo(n0) + " - 5554 - 11108 - avd0");
+            System.out.println(hashedkey.compareTo(n2) + " - 5558 - 11116 - avd2");
+            System.out.println(hashedkey.compareTo(n3) + " - 5560 - 11120 - avd3");
             
         } catch (Exception e){
             System.out.println("Hello World");
