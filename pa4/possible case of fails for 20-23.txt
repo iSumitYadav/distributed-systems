@@ -1,0 +1,4 @@
+replication - if replication node time is latest >, and prev version came for replication, if my is latest then replicate
+
+
+original node n0 for key is killed, insert key from other than n0,1 or 2, problem as only replcsn. will occur and rplcsn is async, chance is it'll miss latest
