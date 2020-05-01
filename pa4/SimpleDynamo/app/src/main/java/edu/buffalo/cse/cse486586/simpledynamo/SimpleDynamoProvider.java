@@ -312,10 +312,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 //				}
 //			}
 		} else {
-			if (msgType.equals("getMissedInsert")) {
+//			if (msgType.equals("getMissedInsert")) {
 				newValues.remove("time");
 				newValues.put("time", time);
-			}
+//			}
 			db.delete(TABLE_NAME, "key=?", new String[]{key});
 			newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, key);
 			db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_REPLACE);
@@ -1432,27 +1432,28 @@ public class SimpleDynamoProvider extends ContentProvider {
 					socket.close();
 //					Log.d(TAG, msgType + " ClienTask for key: " + key + " " + "myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG SENT");
 				} catch (EOFException e) {
-					Log.e(TAG, "ClientTask " + msgType + " " + nxtSuccessor + " SocketTimeoutException " + key + " : " + e.toString());
+					Log.e(TAG,
+							"ClientTask ASYNC " + msgType + " " + nxtSuccessor + " SocketTimeoutException " + key + " : " + e.toString());
 
 					String[] forClientPublishProgress = null;
 					if (msgType.equals("insert")) {
 						String port = nxtSuccessor;
 
-						for (int i=0; i<2; i++) {
-							port = successorMap.get(port);
-
-							Log.d(TAG, "insert failed for Async client: " + nxtSuccessor + " key: " + key + " value: "+value);
-							forClientPublishProgress = new String[]{
-								"replication",
-								port,
-								key,
-								value,
-								nxtSuccessor,
-								null
-							};
-
-							publishProgress(forClientPublishProgress);
-						}
+//						for (int i=0; i<2; i++) {
+//							port = successorMap.get(port);
+//
+//							Log.d(TAG, "insert failed for Async client: " + nxtSuccessor + " key: " + key + " value: "+value);
+//							forClientPublishProgress = new String[]{
+//								"replication",
+//								port,
+//								key,
+//								value,
+//								nxtSuccessor,
+//								null
+//							};
+//
+//							publishProgress(forClientPublishProgress);
+//						}
 //					} else if (msgType.equals("replication")) {
 //						String port = nxtSuccessor;
 //						String originatorPort = msgs[4];
