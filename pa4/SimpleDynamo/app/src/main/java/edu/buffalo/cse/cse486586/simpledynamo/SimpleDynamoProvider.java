@@ -39,10 +39,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 	static final String CONNECT_PORT = "";
 	String myPort = null;
 	String portStr = null;
-	boolean INSERTION = false;
 	boolean logging = true;
-	String myPortHash = null;
 	String successor = null;
+	String myPortHash = null;
+	boolean insertion = false;
 	String predecessor = null;
 	String successorHash = null;
 	String predecessorHash = null;
@@ -111,7 +111,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 	public Uri insert(Uri uri, ContentValues values) {
 		// TODO Auto-generated method stub
 		String originalKey = (String) values.get("key");
-		// INSERTION = true;
+		insertion = true;
 		String hashedKey = null;
 		try {
 			hashedKey = genHash(originalKey);
@@ -259,7 +259,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //			new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", portToStoreKey, originalKey, (String) values.get("value"));
 			actSynchronously("insert", portToStoreKey, originalKey, (String) values.get("value"), Long.toString(System.currentTimeMillis()));
 		}
-		INSERTION = false;
+		insertion = false;
 
 
 		return uri;
@@ -280,7 +280,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 		 	}
 		 	Log.e(TAG, "280: "+e.toString());
 		 }
-		// INSERTION = true;
+		 insertion = true;
 		ContentValues newValues = new ContentValues();
 
 //		newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, originalKey);
@@ -357,7 +357,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //			newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, key);
 //			db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_REPLACE);
 //		}
-		INSERTION = false;
+		insertion = false;
 //		db.insertWithOnConflict(TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_IGNORE);
 //		db.insert(TABLE_NAME, null, values);
 
@@ -475,7 +475,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 		Cursor cursor = null;
 		Cursor dummyCursor = null;
 
-		while(INSERTION) {
+		while(insertion) {
 			if (logging == true) {
 				Log.d(TAG, "score INSERTION BEING DONE FOR " +
 						"KEY: " + selection);
@@ -638,7 +638,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 				if (logging == true) {
 					Log.d(TAG, "query " + dupSelection);
 				}
-				while(INSERTION) {
+				while(insertion) {
 					if (logging == true) {
 						Log.d(TAG,
 								"score 2 "+dupSelection+" BEING DONE FOR KEY: " + selection);
@@ -734,7 +734,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 			selection = COLUMN_NAME_KEY + "=? AND type != ?";
 
-			while(INSERTION) {
+			while(insertion) {
 				if (logging == true) {
 					Log.d(TAG,
 							"score 3 "+selection+" BEING DONE FOR KEY: " + selectionArgss[0] + " type: " + selectionArgss[1]);
@@ -770,7 +770,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //				if (cursor.getCount() > 0 && myPort.equals(portToStoreKey)) {
 //				if (myPort.equals(portToStoreKey)) {
 //					while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
-				while(INSERTION) {
+				while(insertion) {
 					if (logging == true) {
 						Log.d(TAG, "score 3 "+selection+" " +
 								"BEING DONE FOR KEY: " + selectionArgss[0] + " type: " + selectionArgss[1]);
