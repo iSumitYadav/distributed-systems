@@ -70,7 +70,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 		String[] selectionArgss = new String[]{selection};
 		selection = COLUMN_NAME_KEY + "=?";
 
-		db.delete(TABLE_NAME, selection, selectionArgss);
+//		db.delete(TABLE_NAME, selection, selectionArgss);
+		ContentValues newValues = new ContentValues();
+		newValues.put("type", "deleted");
+		db.update(TABLE_NAME, newValues, selection, selectionArgss);
 		Log.d(TAG, "key deleted locally: " + selectionArgss[0]);
 
 		String portToStoreKey = getNodeToStoreKey(hashedKey);
@@ -409,6 +412,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 			db = DBHelper.getWritableDatabase();
 			if (db != null) {
 
+				db.delete(TABLE_NAME, null, null);
+
 				String port = myPort;
 				for (int i = 0; i < 2; i++) {
 					port = predecessorMap.get(port);
@@ -464,11 +469,20 @@ public class SimpleDynamoProvider extends ContentProvider {
 		Log.d(TAG, "QUERY GLOBAL myPort: " + myPort + ", succ: "+ successor + ", pred: "+predecessor);
 
 		if (selection.equals("@") || selection.equals("LDump")) {
+			String dupSelection;
+			String[] selectionArgss = null;
+
+			if (selection.equals("@")) {
+				dupSelection = "type != ?";
+				selectionArgss = new String[] {"deleted"};
+			} else {
+				dupSelection = null;
+			}
 			cursor = db.query(
 				TABLE_NAME,
 				projection,
-				null,
-				null,
+				dupSelection,
+				selectionArgss,
 				null,
 				null,
 				sortOrder,
@@ -539,8 +553,8 @@ public class SimpleDynamoProvider extends ContentProvider {
 				cursor = db.query(
 					TABLE_NAME,
 					projection,
-					null,
-					null,
+					"type != ?",
+					new String[] {"deleted"},
 					null,
 					null,
 					sortOrder,
@@ -565,10 +579,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 					Log.d(TAG,
 							"score 2 "+dupSelection+" BEING DONE FOR KEY: " + selection);
 				}
-				if (dupSelection.equals("insertion") || dupSelection.equals(
-						"replication")) {
-					projection = null;
-				}
+//				if (dupSelection.equals("insertion") || dupSelection.equals(
+//						"replication")) {
+//					projection = null;
+//				}
 				cursor = db.query(
 						TABLE_NAME,
 						projection,
@@ -624,16 +638,17 @@ public class SimpleDynamoProvider extends ContentProvider {
 				Log.e(TAG, "CP insert hashedKey " + e.toString());
 			}
 
-			String[] selectionArgss = new String[]{selection};
+			String[] selectionArgss = new String[]{selection, "deleted"};
 			String portToStoreKey = getNodeToStoreKey(hashedKey);
 
 			Log.d(TAG, "QUERYING " + myPort + " " + selection);
 			Log.d(TAG, "QUERYING myPort.equals(portToStoreKey) " + myPort + " " + selection);
 
-			selection = COLUMN_NAME_KEY + "=?";
+			selection = COLUMN_NAME_KEY + "=? AND type != ?";
 
 			while(INSERTION) {
-				Log.d(TAG, "score 3 "+selection+" BEING DONE FOR KEY: " + selectionArgss[0]);
+				Log.d(TAG,
+						"score 3 "+selection+" BEING DONE FOR KEY: " + selectionArgss[0] + " type: " + selectionArgss[1]);
 			}
 
 
@@ -664,7 +679,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //				if (myPort.equals(portToStoreKey)) {
 //					while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
 				while(INSERTION) {
-					Log.d(TAG, "score 3 "+selection+" BEING DONE FOR KEY: " + selectionArgss[0]);
+					Log.d(TAG, "score 3 "+selection+" BEING DONE FOR KEY: " + selectionArgss[0] + " type: " + selectionArgss[1]);
 				}
 						cursor = db.query(
 								TABLE_NAME,
