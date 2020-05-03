@@ -1,0 +1,336 @@
+diff --git a/.DS_Store b/.DS_Store
+index cbc54a7..e99fb25 100644
+Binary files a/.DS_Store and b/.DS_Store differ
+diff --git a/pa4/.DS_Store b/pa4/.DS_Store
+index 47b48fe..1a4cd46 100644
+Binary files a/pa4/.DS_Store and b/pa4/.DS_Store differ
+diff --git a/pa4/SimpleDynamo.zip b/pa4/SimpleDynamo.zip
+deleted file mode 100644
+index 6ac55a3..0000000
+Binary files a/pa4/SimpleDynamo.zip and /dev/null differ
+diff --git a/pa4/SimpleDynamo/app/src/main/java/edu/buffalo/cse/cse486586/simpledynamo/OnTestClickListener.java b/pa4/SimpleDynamo/app/src/main/java/edu/buffalo/cse/cse486586/simpledynamo/OnTestClickListener.java
+deleted file mode 100644
+index 84b4684..0000000
+--- a/pa4/SimpleDynamo/app/src/main/java/edu/buffalo/cse/cse486586/simpledynamo/OnTestClickListener.java
++++ /dev/null
+@@ -1,142 +0,0 @@
+-package edu.buffalo.cse.cse486586.simpledynamo;
+-
+-import android.content.ContentResolver;
+-import android.content.ContentValues;
+-import android.database.Cursor;
+-import android.net.Uri;
+-import android.os.AsyncTask;
+-import android.util.Log;
+-import android.view.View;
+-import android.view.View.OnClickListener;
+-import android.widget.TextView;
+-
+-public class OnTestClickListener implements OnClickListener {
+-
+-    private static final String TAG = OnTestClickListener.class.getName();
+-    private static final int TEST_CNT = 50;
+-    private static final String KEY_FIELD = "key";
+-    private static final String VALUE_FIELD = "value";
+-
+-    private final TextView mTextView;
+-    private final ContentResolver mContentResolver;
+-    private final Uri mUri;
+-    private final ContentValues[] mContentValues;
+-
+-    public OnTestClickListener(TextView _tv, ContentResolver _cr) {
+-        mTextView = _tv;
+-        mContentResolver = _cr;
+-        mUri = buildUri("content", "edu.buffalo.cse.cse486586.simpledynamo.provider");
+-        mContentValues = initTestValues();
+-    }
+-
+-    private Uri buildUri(String scheme, String authority) {
+-        Uri.Builder uriBuilder = new Uri.Builder();
+-        uriBuilder.authority(authority);
+-        uriBuilder.scheme(scheme);
+-        return uriBuilder.build();
+-    }
+-
+-    private ContentValues[] initTestValues() {
+-        ContentValues[] cv = new ContentValues[TEST_CNT];
+-        for (int i = 0; i < TEST_CNT; i++) {
+-            cv[i] = new ContentValues();
+-            cv[i].put(KEY_FIELD, "key" + Integer.toString(i));
+-            cv[i].put(VALUE_FIELD, "val" + Integer.toString(i));
+-        }
+-
+-        return cv;
+-    }
+-
+-    @Override
+-    public void onClick(View v) {
+-        new Task().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+-    }
+-
+-    private class Task extends AsyncTask<Void, String, Void> {
+-
+-        @Override
+-        protected Void doInBackground(Void... params) {
+-            if (testInsert()) {
+-                publishProgress("Insert success\n");
+-            } else {
+-                publishProgress("Insert fail\n");
+-                return null;
+-            }
+-
+-            if (testQuery()) {
+-                publishProgress("Query success\n");
+-            } else {
+-                publishProgress("Query fail\n");
+-            }
+-
+-            return null;
+-        }
+-
+-        protected void onProgressUpdate(String...strings) {
+-            mTextView.append(strings[0]);
+-
+-            return;
+-        }
+-
+-        private boolean testInsert() {
+-            try {
+-                for (int i = 0; i < TEST_CNT; i++) {
+-                    mContentResolver.insert(mUri, mContentValues[i]);
+-                }
+-            } catch (Exception e) {
+-                Log.e(TAG, e.toString());
+-                return false;
+-            }
+-
+-            return true;
+-        }
+-
+-        private boolean testQuery() {
+-            try {
+-                for (int i = 0; i < TEST_CNT; i++) {
+-                    String key = (String) mContentValues[i].get(KEY_FIELD);
+-                    String val = (String) mContentValues[i].get(VALUE_FIELD);
+-
+-                    Cursor resultCursor = mContentResolver.query(mUri, null,
+-                            key, null, null);
+-                    if (resultCursor == null) {
+-                        Log.e(TAG, "Result null");
+-                        throw new Exception();
+-                    }
+-
+-                    int keyIndex = resultCursor.getColumnIndex(KEY_FIELD);
+-                    int valueIndex = resultCursor.getColumnIndex(VALUE_FIELD);
+-                    if (keyIndex == -1 || valueIndex == -1) {
+-                        Log.e(TAG, "Wrong columns");
+-                        resultCursor.close();
+-                        throw new Exception();
+-                    }
+-
+-                    resultCursor.moveToFirst();
+-
+-                    if (!(resultCursor.isFirst() && resultCursor.isLast())) {
+-                        Log.e(TAG, "Wrong number of rows");
+-                        resultCursor.close();
+-                        throw new Exception();
+-                    }
+-
+-                    String returnKey = resultCursor.getString(keyIndex);
+-                    String returnValue = resultCursor.getString(valueIndex);
+-                    if (!(returnKey.equals(key) && returnValue.equals(val))) {
+-                        Log.e(TAG, "(key, value) pairs don't match\n");
+-                        resultCursor.close();
+-                        throw new Exception();
+-                    }
+-
+-                    resultCursor.close();
+-                }
+-            } catch (Exception e) {
+-                Log.e(TAG, e.toString());
+-                e.printStackTrace();
+-                return false;
+-            }
+-
+-            return true;
+-        }
+-    }
+-}
+diff --git a/pa4/SimpleDynamo/app/src/main/java/edu/buffalo/cse/cse486586/simpledynamo/SimpleDynamoActivity.java b/pa4/SimpleDynamo/app/src/main/java/edu/buffalo/cse/cse486586/simpledynamo/SimpleDynamoActivity.java
+index e748a38..b3b1536 100644
+--- a/pa4/SimpleDynamo/app/src/main/java/edu/buffalo/cse/cse486586/simpledynamo/SimpleDynamoActivity.java
++++ b/pa4/SimpleDynamo/app/src/main/java/edu/buffalo/cse/cse486586/simpledynamo/SimpleDynamoActivity.java
+@@ -1,79 +1,21 @@
+ package edu.buffalo.cse.cse486586.simpledynamo;
+ 
+-import android.util.Log;
+ import android.os.Bundle;
+-import android.view.Menu;
+-import android.view.View;
+ import android.app.Activity;
+-import android.widget.Button;
+-import android.widget.TextView;
+-import android.database.Cursor;
+ import android.text.method.ScrollingMovementMethod;
++import android.util.Log;
++import android.view.Menu;
++import android.widget.TextView;
+ 
+ public class SimpleDynamoActivity extends Activity {
+-	static final String TAG = SimpleDynamoActivity.class.getSimpleName();
+ 
+ 	@Override
+ 	protected void onCreate(Bundle savedInstanceState) {
+ 		super.onCreate(savedInstanceState);
+ 		setContentView(R.layout.activity_simple_dynamo);
+ 
+-
+-		final Button LDump = (Button) findViewById(R.id.button1);
+-		LDump.setOnClickListener(new View.OnClickListener() {
+-			public void onClick(View v) {
+-				getDataFromCP("LDump");
+-			}
+-		});
+-
+-
+-		final Button GDump = (Button) findViewById(R.id.button2);
+-		GDump.setOnClickListener(new View.OnClickListener() {
+-			public void onClick(View v) {
+-				getDataFromCP("GDump");
+-			}
+-		});
+-	}
+-
+-	public void getDataFromCP(String query){
+-		final TextView tv = (TextView) findViewById(R.id.textView1);
++		TextView tv = (TextView) findViewById(R.id.textView1);
+ 		tv.setMovementMethod(new ScrollingMovementMethod());
+-		findViewById(R.id.button3).setOnClickListener(new OnTestClickListener(tv, getContentResolver()));
+-
+-		Cursor resultCursor = getContentResolver().query(
+-			SimpleDynamoProvider.CONTENT_URI,
+-			null,
+-			query,
+-			null,
+-			null
+-		);
+-
+-		int i = 0;
+-		try {
+-			if (resultCursor.moveToFirst()) {
+-				while (!resultCursor.isAfterLast()) {
+-					String key = resultCursor.getString(0);
+-					String value = resultCursor.getString(1);
+-					String type = resultCursor.getString(2);
+-					String port = resultCursor.getString(3);
+-					String time = resultCursor.getString(4);
+-
+-					tv.append(i + " KEY: " + key + " \n VALUE: " + value + " " +
+-							"\n" +
+-							" " +
+-							"TYPE: " + type + " \n PORT: "+ port + " \n TIME:" +
+-							" " + time + "\n\n\n");
+-					i++;
+-
+-					resultCursor.moveToNext();
+-				}
+-			}
+-		} catch (Exception e) {
+-			Log.e(TAG, e.toString());
+-			return;
+-		} finally {
+-			resultCursor.close();
+-		}
+ 	}
+ 
+ 	@Override
+@@ -82,10 +24,10 @@ public class SimpleDynamoActivity extends Activity {
+ 		getMenuInflater().inflate(R.menu.simple_dynamo, menu);
+ 		return true;
+ 	}
+-	
++
+ 	public void onStop() {
+-        super.onStop();
+-	    Log.v("Test", "onStop()");
++		super.onStop();
++		Log.v("Test", "onStop()");
+ 	}
+ 
+ }
+diff --git a/pa4/SimpleDynamo/app/src/main/res/layout/activity_simple_dynamo.xml b/pa4/SimpleDynamo/app/src/main/res/layout/activity_simple_dynamo.xml
+index d8c7327..2012e03 100644
+--- a/pa4/SimpleDynamo/app/src/main/res/layout/activity_simple_dynamo.xml
++++ b/pa4/SimpleDynamo/app/src/main/res/layout/activity_simple_dynamo.xml
+@@ -8,30 +8,6 @@
+     android:paddingTop="@dimen/activity_vertical_margin"
+     tools:context=".SimpleDynamoActivity" >
+ 
+-    <Button
+-        android:id="@+id/button1"
+-        android:layout_width="wrap_content"
+-        android:layout_height="wrap_content"
+-        android:layout_alignParentLeft="true"
+-        android:layout_alignParentTop="true"
+-        android:text="@string/button_ldump" />
+-
+-    <Button
+-        android:id="@+id/button2"
+-        android:layout_width="wrap_content"
+-        android:layout_height="wrap_content"
+-        android:layout_alignParentTop="true"
+-        android:layout_centerHorizontal="true"
+-        android:text="@string/button_gdump" />
+-
+-    <Button
+-        android:id="@+id/button3"
+-        android:layout_width="wrap_content"
+-        android:layout_height="wrap_content"
+-        android:layout_alignParentRight="true"
+-        android:layout_alignParentTop="true"
+-        android:text="@string/button_test" />
+-
+ 
+     <TextView
+         android:id="@+id/textView1"
+@@ -39,10 +15,9 @@
+         android:layout_height="wrap_content"
+         android:layout_alignParentLeft="true"
+         android:layout_alignParentRight="true"
+-        android:textIsSelectable="true"
+-        android:layout_below="@+id/button1"
+         android:fadeScrollbars="true"
+         android:gravity="bottom"
+-        android:maxLines="17"
++        android:maxLines="13"
++        android:textIsSelectable="true"
+         android:scrollbars="vertical" />
+ </RelativeLayout>
+\ No newline at end of file
+diff --git a/pa4/SimpleDynamo/app/src/main/res/values/strings.xml b/pa4/SimpleDynamo/app/src/main/res/values/strings.xml
+index 5d749c7..e7012c4 100644
+--- a/pa4/SimpleDynamo/app/src/main/res/values/strings.xml
++++ b/pa4/SimpleDynamo/app/src/main/res/values/strings.xml
+@@ -3,8 +3,5 @@
+ 
+     <string name="app_name">SimpleDynamo</string>
+     <string name="action_settings">Settings</string>
+-    <string name="button_ldump">LDump</string>
+-    <string name="button_gdump">GDump</string>
+-    <string name="button_test">Test</string>
+ 
+ </resources>
+\ No newline at end of file
+diff --git a/pa4/term-cmds.txt b/pa4/term-cmds.txt
+index 6fcccd5..b51d2a5 100644
+--- a/pa4/term-cmds.txt
++++ b/pa4/term-cmds.txt
+@@ -7,7 +7,7 @@ for i in $(seq 1 10); do echo $(tail -1 rpa4.txt)"-"$i > gitmsg.txt; done
+ 
+ alias r415="for i in $(seq 1 15); do r4; echo $(tail -1 rpa4.txt)"--"$i > gitmsg.txt; for i in $(seq 1 5); do tail -1 gitmsg.txt | say; sleep 2; done; gadd; git commit -F gitmsg.txt; pp4; done;"
+ 
+-for i in $(seq 1 15); do $(r4); echo $(tail -1 rpa4.txt)\"--\"$i > gitmsg.txt; for j in $(seq 1 5); do tail -1 gitmsg.txt | say; sleep 2; done; $(gadd); git commit -F gitmsg.txt; $(pp4); done;
++for i in $(seq 1 15); do $(r4); echo $(tail -1 rpa4.txt)"--"$i > gitmsg.txt; for j in $(seq 1 5); do tail -1 gitmsg.txt | say; sleep 2; done; $(gadd); git commit -F gitmsg.txt; $(pp4); done;
+ 
+ 
+ 
