@@ -39,7 +39,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 	static final String CONNECT_PORT = "";
 	String myPort = null;
 	String portStr = null;
-	boolean logging = true;
+	boolean logging = false;
 	String successor = null;
 	String myPortHash = null;
 	boolean insertion = false;
