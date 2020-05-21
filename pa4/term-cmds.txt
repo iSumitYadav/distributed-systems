@@ -1,0 +1,23 @@
+for i in $(seq 1 10); do echo $(tail -1 rpa4.txt)"-"$i > gitmsg.txt; done
+
+
+
+
+
+
+alias r415="for i in $(seq 1 15); do r4; echo $(tail -1 rpa4.txt)"--"$i > gitmsg.txt; for i in $(seq 1 5); do tail -1 gitmsg.txt | say; sleep 2; done; gadd; git commit -F gitmsg.txt; pp4; done;"
+
+for i in $(seq 1 15); do $(r4); echo $(tail -1 rpa4.txt)"--"$i > gitmsg.txt; for j in $(seq 1 5); do tail -1 gitmsg.txt | say; sleep 2; done; $(gadd); git commit -F gitmsg.txt; $(pp4); done;
+
+
+
+
+repeat_say_done="for i in $(seq 1 5); do tail -1 gitmsg.txt | say; sleep 3; done;"
+
+
+
+for i in $(seq 1 5); do tail -1 gitmsg.txt | say; done;
+
+
+
+for i in $(seq 1 2); do for i in $(seq 1 2); do tail -1 gitmsg.txt | say; done; done;

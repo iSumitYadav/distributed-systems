@@ -39,9 +39,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 	static final String CONNECT_PORT = "";
 	String myPort = null;
 	String portStr = null;
-	boolean INSERTION = false;
-	String myPortHash = null;
+	boolean logging = false;
 	String successor = null;
+	String myPortHash = null;
+	boolean insertion = false;
 	String predecessor = null;
 	String successorHash = null;
 	String predecessorHash = null;
@@ -59,19 +60,29 @@ public class SimpleDynamoProvider extends ContentProvider {
 	public int delete(Uri uri, String selection, String[] selectionArgs) {
 		// TODO Auto-generated method stub
 
-		Log.d(TAG, "delete key: " + selection);
+		if (logging == true) {
+			Log.d(TAG, "delete key: " + selection);
+		}
 		String hashedKey = null;
 		try {
 			hashedKey = genHash(selection);
 		} catch (NoSuchAlgorithmException e) {
-			Log.e(TAG, "CP delete hashedKey originalKey: " + selection + " " + e.toString());
+			if (logging == true) {
+				Log.e(TAG, "CP delete hashedKey originalKey: " + selection + " " + e.toString());
+			}
+			Log.e(TAG, "73 " + e.toString());
 		}
 
 		String[] selectionArgss = new String[]{selection};
 		selection = COLUMN_NAME_KEY + "=?";
 
-		db.delete(TABLE_NAME, selection, selectionArgss);
-		Log.d(TAG, "key deleted locally: " + selectionArgss[0]);
+//		db.delete(TABLE_NAME, selection, selectionArgss);
+		ContentValues newValues = new ContentValues();
+		newValues.put("type", "deleted");
+		db.update(TABLE_NAME, newValues, selection, selectionArgss);
+		if (logging == true) {
+			Log.d(TAG, "key deleted locally: " + selectionArgss[0]);
+		}
 
 		String portToStoreKey = getNodeToStoreKey(hashedKey);
 		if (myPort.equals(portToStoreKey)) {
@@ -80,7 +91,9 @@ public class SimpleDynamoProvider extends ContentProvider {
 			for (int i = 0; i < 2; i++) {
 				port = successorMap.get(port);
 
-				Log.d(TAG, "calling succ: " + port + " to delete from:" + myPort);
+				if (logging == true) {
+					Log.d(TAG, "calling succ: " + port + " to delete from:" + myPort);
+				}
 				new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "delete", port, selectionArgss[0]);
 			}
 		}
@@ -98,12 +111,15 @@ public class SimpleDynamoProvider extends ContentProvider {
 	public Uri insert(Uri uri, ContentValues values) {
 		// TODO Auto-generated method stub
 		String originalKey = (String) values.get("key");
-		INSERTION = true;
+		insertion = true;
 		String hashedKey = null;
 		try {
 			hashedKey = genHash(originalKey);
 		} catch (NoSuchAlgorithmException e) {
-			Log.e(TAG, "CP insert hashedKey " + e.toString());
+			if (logging == true) {
+				Log.e(TAG, "CP insert hashedKey " + e.toString());
+			}
+			Log.e(TAG, "122: "+ e.toString());
 		}
 
 		String portToStoreKey = getNodeToStoreKey(hashedKey);
@@ -111,9 +127,11 @@ public class SimpleDynamoProvider extends ContentProvider {
 		String succ2 = successorMap.get(succ1);
 //		String time = Long.toString(System.currentTimeMillis());
 
-		 Log.d(TAG, "INSERTION " + myPort + " key: " + originalKey + " value:" +(String) values.get("value"));
+		 if (logging == true) {
+		 	Log.d(TAG, "INSERTION " + myPort + " key: " + originalKey + " value:" +(String) values.get("value"));
+		 }
 		if (myPort.equals(portToStoreKey)) {
-			// Log.d(TAG, "INSERTION myPort.equals(portToStoreKey) " + myPort + " " + originalKey);
+			// if (logging == true)Log.d(TAG, "INSERTION myPort.equals(portToStoreKey) " + myPort + " " + originalKey);
 			ContentValues newValues = new ContentValues();
 
 //			newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, originalKey);
@@ -237,25 +255,32 @@ public class SimpleDynamoProvider extends ContentProvider {
 						(String) values.get("value"), portToStoreKey, time);
 			}
 		} else {
-			// Log.d(TAG, "INSERTION myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + originalKey);
+			// if (logging == true)Log.d(TAG, "INSERTION myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + originalKey);
 //			new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "insert", portToStoreKey, originalKey, (String) values.get("value"));
 			actSynchronously("insert", portToStoreKey, originalKey, (String) values.get("value"), Long.toString(System.currentTimeMillis()));
 		}
-		INSERTION = false;
+		insertion = false;
 
 
 		return uri;
 	}
 
 	public Uri insertReplication(Uri uri, String key, String value, String type, String port, String msgType, String time) {
-		 Log.d(TAG,
+		 if (logging == true) {
+		 	Log.d(TAG,
 				 "insertReplicationFunc: " + " key: "+ key + " value: "+ value + " type: "+ type + " port: "+ port + " myPort: " + myPort+" msgType: "+msgType);
-		 try {
-			 Log.d(TAG, "time:" + time);
-		 } catch (Exception e) {
-		 	Log.e(TAG, "time exception: "+e.toString());
 		 }
-		INSERTION = true;
+		 try {
+			 if (logging == true) {
+			 	Log.d(TAG, "time:" + time);
+			 }
+		 } catch (Exception e) {
+		 	if (logging == true) {
+		 		Log.e(TAG, "time exception: "+e.toString());
+		 	}
+		 	Log.e(TAG, "280: "+e.toString());
+		 }
+		 insertion = true;
 		ContentValues newValues = new ContentValues();
 
 //		newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, originalKey);
@@ -292,7 +317,9 @@ public class SimpleDynamoProvider extends ContentProvider {
 				}
 			} else if (msgType.equals("replication")) {
 				if (time == null) {
-					Log.d(TAG, "time is null in replication");
+					if (logging == true) {
+						Log.d(TAG, "time is null in replication");
+					}
 					db.delete(TABLE_NAME, "key=?", new String[]{key});
 					newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, key);
 					db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_REPLACE);
@@ -319,7 +346,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 			db.delete(TABLE_NAME, "key=?", new String[]{key});
 			newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, key);
 			db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_REPLACE);
-			Log.d(TAG, "timetime insertReplication cursor is null: " + time);
+			if (logging == true) {
+				Log.d(TAG, "timetime insertReplication " +
+						"cursor is null: " + time);
+			}
 		}
 
 //		int updated = db.update(TABLE_NAME, newValues, COLUMN_NAME_KEY+"=?", new String[]{key});
@@ -327,7 +357,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //			newValues.put(SimpleDynamoProvider.COLUMN_NAME_KEY, key);
 //			db.insertWithOnConflict(TABLE_NAME, null, newValues, SQLiteDatabase.CONFLICT_REPLACE);
 //		}
-		INSERTION = false;
+		insertion = false;
 //		db.insertWithOnConflict(TABLE_NAME, null, values, SQLiteDatabase.CONFLICT_IGNORE);
 //		db.insert(TABLE_NAME, null, values);
 
@@ -395,7 +425,9 @@ public class SimpleDynamoProvider extends ContentProvider {
 			portStr = tel.getLine1Number().substring(tel.getLine1Number().length() - 4);
 			myPort = String.valueOf((Integer.parseInt(portStr) * 2));
 
-			Log.d(TAG, "CP onCreate: " + myPort);
+			if (logging == true) {
+				Log.d(TAG, "CP onCreate: " + myPort);
+			}
 
 			myPortHash = portHashMap.get(myPort);
 
@@ -409,11 +441,13 @@ public class SimpleDynamoProvider extends ContentProvider {
 			db = DBHelper.getWritableDatabase();
 			if (db != null) {
 
+				db.delete(TABLE_NAME, null, null);
+
 				String port = myPort;
 				for (int i = 0; i < 2; i++) {
 					port = predecessorMap.get(port);
 
-					// Log.d(TAG, "calling pred: " + port + " to replicate from:" + " " + myPort);
+					// if (logging == true)Log.d(TAG, "calling pred: " + port + " to replicate from:" + " " + myPort);
 					new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "replicate", port, myPort);
 //					actSynchronously("replicate", port, myPort, null);
 				}
@@ -421,7 +455,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 				port = myPort;
 				for (int i = 0; i < 2; i++) {
 					port = successorMap.get(port);
-					// Log.d(TAG, "calling succ: " + port + " to getMissedInsert from:" + myPort);
+					// if (logging == true)Log.d(TAG, "calling succ: " + port + " to getMissedInsert from:" + myPort);
 					new ClientTask().executeOnExecutor(AsyncTask.SERIAL_EXECUTOR, "getMissedInsert", port, myPort);
 //					actSynchronously("getMissedInsert", port, myPort, null);
 				}
@@ -441,8 +475,11 @@ public class SimpleDynamoProvider extends ContentProvider {
 		Cursor cursor = null;
 		Cursor dummyCursor = null;
 
-		while(INSERTION) {
-			Log.d(TAG, "score INSERTION BEING DONE FOR KEY: " + selection);
+		while(insertion) {
+			if (logging == true) {
+				Log.d(TAG, "score INSERTION BEING DONE FOR " +
+						"KEY: " + selection);
+			}
 		}
 
 		boolean ORIGIN = true;
@@ -451,8 +488,9 @@ public class SimpleDynamoProvider extends ContentProvider {
 			ORIGIN = false;
 			originatorPort = selectionArgs[0];
 		}
-		Log.d(TAG, "qKEY selection:" + selection + " myPort: "+ myPort + " " + "originatorPort: " + originatorPort);
-
+		if (logging == true) {
+			Log.d(TAG, "qKEY selection:" + selection + " myPort: " + myPort + " " + "originatorPort: " + originatorPort);
+		}
 
 //		if (myPort.equals(originatorPort)) {
 //			projection = new String[]{COLUMN_NAME_KEY, COLUMN_NAME_VALUE};
@@ -460,21 +498,37 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 		sortOrder = "time DESC";
 
-		Log.d(TAG, "replicate query insertion 1");
-		Log.d(TAG, "QUERY GLOBAL myPort: " + myPort + ", succ: "+ successor + ", pred: "+predecessor);
+		if (logging == true) {
+			Log.d(TAG, "replicate query insertion 1");
+		}
+		if (logging == true) {
+			Log.d(TAG, "QUERY GLOBAL myPort: " + myPort + "," +
+					" succ: "+ successor + ", pred: "+predecessor);
+		}
 
 		if (selection.equals("@") || selection.equals("LDump")) {
+			String dupSelection;
+			String[] selectionArgss = null;
+
+			if (selection.equals("@")) {
+				dupSelection = "type != ?";
+				selectionArgss = new String[] {"deleted"};
+			} else {
+				dupSelection = null;
+			}
 			cursor = db.query(
 				TABLE_NAME,
 				projection,
-				null,
-				null,
+				dupSelection,
+				selectionArgss,
 				null,
 				null,
 				sortOrder,
 				null
 			);
-			Log.d(TAG, "query: " + selection);
+			if (logging == true) {
+				Log.d(TAG, "query: " + selection);
+			}
 			dummyCursor = db.query(
 					TABLE_NAME,
 					null,
@@ -485,16 +539,27 @@ public class SimpleDynamoProvider extends ContentProvider {
 					sortOrder,
 					null
 			);
-			Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
-			Log.d(TAG, "qKEY " + selection);
+			if (logging == true) {
+				Log.d(TAG,
+						DatabaseUtils.dumpCursorToString(dummyCursor));
+			}
+			if (logging == true) {
+				Log.d(TAG, "qKEY " + selection);
+			}
 		} else if (selection.equals("*") || selection.equals("GDump") || selection.equals("insertion") || selection.equals("replication")) {
-			Log.d(TAG, "in * query myPort: " + myPort);
+			if (logging == true) {
+				Log.d(TAG, "in * query myPort: " + myPort);
+			}
 
 			String dupSelection = selection;
 			String[] selectionArgss = null;
-			Log.d(TAG, "replicate query insertion 2");
+			if (logging == true) {
+				Log.d(TAG, "replicate query insertion 2");
+			}
 			if (selection.equals("insertion") || selection.equals("replication")) {
-				Log.d(TAG, "replicate query insertion 3");
+				if (logging == true) {
+					Log.d(TAG, "replicate query insertion 3");
+				}
 
 
 				if (selection.equals("insertion")) {
@@ -505,7 +570,9 @@ public class SimpleDynamoProvider extends ContentProvider {
 					selection = "type=? AND port=?";
 				}
 
-				Log.d(TAG, "replicate query insertion 4");
+				if (logging == true) {
+					Log.d(TAG, "replicate query insertion 4");
+				}
 
 				try {
 					cursor = db.query(
@@ -529,18 +596,24 @@ public class SimpleDynamoProvider extends ContentProvider {
 							sortOrder,
 							null
 					);
-					Log.d(TAG, "replicate query insertion 5");
+					if (logging == true) {
+						Log.d(TAG, "replicate query " +
+								"insertion 5");
+					}
 				} catch (Exception e) {
-					Log.e(TAG,
-							"Query ERROR " + selection + " " + selectionArgss[0]);
-					// Log.d(TAG, "Query ERROR " + selection + " " + selectionArgss[0] + " " + selectionArgss[1]);
+					if (logging == true) {
+						Log.e(TAG,
+								"Query ERROR " + selection + " " + selectionArgss[0]);
+					}
+					Log.e(TAG, "608: " + e.toString());
+					// if (logging == true)Log.d(TAG, "Query ERROR " + selection + " " + selectionArgss[0] + " " + selectionArgss[1]);
 				}
 			} else {
 				cursor = db.query(
 					TABLE_NAME,
 					projection,
-					null,
-					null,
+					"type != ?",
+					new String[] {"deleted"},
 					null,
 					null,
 					sortOrder,
@@ -559,16 +632,22 @@ public class SimpleDynamoProvider extends ContentProvider {
 			}
 
 			if (selection.equals("GDump") || dupSelection.equals("insertion") || dupSelection.equals("replication")) {
-				Log.d(TAG, "replicate query insertion 6");
-				Log.d(TAG, "query " + dupSelection);
-				while(INSERTION) {
-					Log.d(TAG,
-							"score 2 "+dupSelection+" BEING DONE FOR KEY: " + selection);
+				if (logging == true) {
+					Log.d(TAG, "replicate query insertion 6");
 				}
-				if (dupSelection.equals("insertion") || dupSelection.equals(
-						"replication")) {
-					projection = null;
+				if (logging == true) {
+					Log.d(TAG, "query " + dupSelection);
 				}
+				while(insertion) {
+					if (logging == true) {
+						Log.d(TAG,
+								"score 2 "+dupSelection+" BEING DONE FOR KEY: " + selection);
+					}
+				}
+//				if (dupSelection.equals("insertion") || dupSelection.equals(
+//						"replication")) {
+//					projection = null;
+//				}
 				cursor = db.query(
 						TABLE_NAME,
 						projection,
@@ -589,14 +668,20 @@ public class SimpleDynamoProvider extends ContentProvider {
 						sortOrder,
 						null
 				);
-				Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+				if (logging == true) {
+					Log.d(TAG,
+							DatabaseUtils.dumpCursorToString(dummyCursor));
+				}
 //				cursor.moveToFirst();
 				return cursor;
 			}
 
 //			if (successor != null && !successor.equals(originatorPort)) {
-				Log.d(TAG, "successor != null && !successor.equals" +
-						"(originatorPort) " + myPort + " to succ "+ successor + " originatorPort: "+originatorPort);
+				if (logging == true) {
+					Log.d(TAG, "successor != null && " +
+							"!successor.equals" +
+							"(originatorPort) " + myPort + " to succ "+ successor + " originatorPort: "+originatorPort);
+				}
 				String succ = successor;
 				Cursor successorCursor = null;
 				while (!succ.equals(myPort)) {
@@ -607,33 +692,53 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 						succ = successorMap.get(succ);
 					} catch (Exception e) {
-						Log.e(TAG, "successor != null && !successor.equals" +
-								"(originatorPort) CATCH: " + e.toString());
+						if (logging == true) {
+							Log.e(TAG, "successor != null && !successor.equals" +
+									"(originatorPort) CATCH: " + e.toString());
+						}
+						Log.e(TAG, "696 " + e.toString());
 						continue;
 					}
 				}
 //			}
-			Log.d(TAG, "query *");
+			if (logging == true) {
+				Log.d(TAG, "query *");
+			}
 			dummyCursor = cursor;
-			Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+			if (logging == true) {
+				Log.d(TAG,
+						DatabaseUtils.dumpCursorToString(dummyCursor));
+			}
 		} else {
 			String hashedKey = null;
 			try {
 				hashedKey = genHash(selection);
 			} catch (NoSuchAlgorithmException e) {
-				Log.e(TAG, "CP insert hashedKey " + e.toString());
+				if (logging == true) {
+					Log.e(TAG, "CP insert hashedKey " + e.toString());
+				}
+				Log.e(TAG, "641" + e.toString());
 			}
 
-			String[] selectionArgss = new String[]{selection};
+			String[] selectionArgss = new String[]{selection, "deleted"};
 			String portToStoreKey = getNodeToStoreKey(hashedKey);
 
-			Log.d(TAG, "QUERYING " + myPort + " " + selection);
-			Log.d(TAG, "QUERYING myPort.equals(portToStoreKey) " + myPort + " " + selection);
+			if (logging == true) {
+				Log.d(TAG,
+						"QUERYING " + myPort + " " + selection);
+			}
+			if (logging == true) {
+				Log.d(TAG, "QUERYING myPort.equals" +
+						"(portToStoreKey) " + myPort + " " + selection);
+			}
 
-			selection = COLUMN_NAME_KEY + "=?";
+			selection = COLUMN_NAME_KEY + "=? AND type != ?";
 
-			while(INSERTION) {
-				Log.d(TAG, "score 3 "+selection+" BEING DONE FOR KEY: " + selectionArgss[0]);
+			while(insertion) {
+				if (logging == true) {
+					Log.d(TAG,
+							"score 3 "+selection+" BEING DONE FOR KEY: " + selectionArgss[0] + " type: " + selectionArgss[1]);
+				}
 			}
 
 
@@ -658,13 +763,18 @@ public class SimpleDynamoProvider extends ContentProvider {
 					"1"
 			);
 
-				Log.d(TAG, "qKEY " + selectionArgss[0]);
+				if (logging == true) {
+					Log.d(TAG, "qKEY " + selectionArgss[0]);
+				}
 			try {
 //				if (cursor.getCount() > 0 && myPort.equals(portToStoreKey)) {
 //				if (myPort.equals(portToStoreKey)) {
 //					while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
-				while(INSERTION) {
-					Log.d(TAG, "score 3 "+selection+" BEING DONE FOR KEY: " + selectionArgss[0]);
+				while(insertion) {
+					if (logging == true) {
+						Log.d(TAG, "score 3 "+selection+" " +
+								"BEING DONE FOR KEY: " + selectionArgss[0] + " type: " + selectionArgss[1]);
+					}
 				}
 						cursor = db.query(
 								TABLE_NAME,
@@ -685,25 +795,25 @@ public class SimpleDynamoProvider extends ContentProvider {
 //
 //
 //					try {
-//						Log.d(TAG, "cursor 1");
+//						if (logging == true)Log.d(TAG, "cursor 1");
 //						port = successorMap.get(port);
 //						if (!port.equals(originatorPort)) {
 //							cursor1 = actSynchronously("search", port, originatorPort, selectionArgss[0]);
 //						}
 //					} catch (Exception e) {
-//						Log.d(TAG, "cursor1 is null maybe");
+//						if (logging == true)Log.d(TAG, "cursor1 is null maybe");
 //						Log.e(TAG, "query myPort.equals(portToStoreKey) first" +
 //								" succ: " + port + " key: "+selectionArgss[0] + " originatorPort:"+originatorPort +" err: "+ e.toString());
 //					}
 //
 //					try {
-//						Log.d(TAG, "cursor 2");
+//						if (logging == true)Log.d(TAG, "cursor 2");
 //						port = successorMap.get(port);
 //						if (!port.equals(originatorPort)) {
 //							cursor2 = actSynchronously("search", port, originatorPort, selectionArgss[0]);
 //						}
 //					} catch (Exception e) {
-//						Log.d(TAG, "cursor2 is null maybe");
+//						if (logging == true)Log.d(TAG, "cursor2 is null maybe");
 //						Log.e(TAG, "query myPort.equals(portToStoreKey) " +
 //								"second" +
 //								" succ: " + port + " key: "+selectionArgss[0] + " originatorPort:"+originatorPort +" err: "+ e.toString());
@@ -717,7 +827,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //
 //					if (cursor != null && cursor.getCount() > 0) {
 //						dummyCursor = cursor;
-//						Log.d(TAG, "dumping time cursor: " + DatabaseUtils.dumpCursorToString(dummyCursor));
+//						if (logging == true)Log.d(TAG, "dumping time cursor: " + DatabaseUtils.dumpCursorToString(dummyCursor));
 //
 //						cursor.moveToFirst();
 //						time = cursor.getString(4);
@@ -732,7 +842,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //
 //					try {
 //						if (cursor1 != null && cursor1.getCount() > 0) {
-//							Log.d(TAG, "cursor1 != null && cursor1.getCount() > 0");
+//							if (logging == true)Log.d(TAG, "cursor1 != null && cursor1.getCount() > 0");
 //							cursor1.moveToFirst();
 //							time1 = cursor1.getString(4);
 //						}
@@ -742,7 +852,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //
 //					try {
 //						if (cursor2 != null && cursor2.getCount() > 0) {
-//							Log.d(TAG, "cursor2 != null && cursor2.getCount() > 0");
+//							if (logging == true)Log.d(TAG, "cursor2 != null && cursor2.getCount() > 0");
 //							cursor2.moveToFirst();
 //							time2 = cursor2.getString(4);
 //						}
@@ -752,25 +862,25 @@ public class SimpleDynamoProvider extends ContentProvider {
 //
 //					if (time != null) {
 //						if (time1 != null && time1.compareTo(time) > 0) {
-//							Log.d(TAG, "time1 != null && time1.compareTo(time) > 0");
+//							if (logging == true)Log.d(TAG, "time1 != null && time1.compareTo(time) > 0");
 //							cursor = cursor1;
 //							time = time1;
 //						}
 //
 //						if (time2 != null && time2.compareTo(time) > 0) {
-//							Log.d(TAG, "time2 != null && time2.compareTo(time) > 0");
+//							if (logging == true)Log.d(TAG, "time2 != null && time2.compareTo(time) > 0");
 //							cursor = cursor2;
 //							time = time2;
 //						}
 //					} else {
 //						if (time1 != null && time2 != null && time1.compareTo(time2) > 0) {
-//							Log.d(TAG, "time1 != null && time2 != null && time1.compareTo(time2) > 0");
+//							if (logging == true)Log.d(TAG, "time1 != null && time2 != null && time1.compareTo(time2) > 0");
 //							cursor = cursor1;
 //						} else if (time1 != null) {
-//							Log.d(TAG, "time1 != null");
+//							if (logging == true)Log.d(TAG, "time1 != null");
 //							cursor = cursor1;
 //						} else {
-//							Log.d(TAG, "time1 == null && time2 == null");
+//							if (logging == true)Log.d(TAG, "time1 == null && time2 == null");
 //							cursor = cursor2;
 //						}
 //					}
@@ -805,17 +915,17 @@ public class SimpleDynamoProvider extends ContentProvider {
 ////					}
 //
 //					dummyCursor = cursor;
-//					Log.d(TAG, "query cursor myPort.equals (portToStoreKey) ");
-//					Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+//					if (logging == true)Log.d(TAG, "query cursor myPort.equals (portToStoreKey) ");
+//					if (logging == true)Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
 //					cursor.moveToFirst();
-//					Log.d(TAG,"cursor qKEY " + cursor.getString(0));
-//					Log.d(TAG,"cursor qVALUE "+ cursor.getString(1));
+//					if (logging == true)Log.d(TAG,"cursor qKEY " + cursor.getString(0));
+//					if (logging == true)Log.d(TAG,"cursor qVALUE "+ cursor.getString(1));
 //				} else {
 //					if (!myPort.equals(portToStoreKey) && !portToStoreKey.equals(originatorPort)) {
 //						// TODO
 //						//HERERERERERERERERRERERER CHECK IF KEY IS REPLICATED LOCALLY
 //						// OR JUST QUERY LOCAL, IF NOT FOUND THEN SEARCH THE RING
-//						Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
+//						if (logging == true)Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
 //						while (((cursor != null && cursor.getCount() <= 0) || cursor == null) && !originatorPort.equals(portToStoreKey)) {
 					// TODO
 					//HERERERERERERERERRERERER CHECK IF KEY IS REPLICATED LOCALLY
@@ -854,7 +964,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 
 
-					Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
+					if (logging == true) {
+						Log.d(TAG, "QUERYING myPort Not " +
+								"equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
+					}
 
 
 					String port = portToStoreKey;
@@ -867,40 +980,63 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 
 					try {
-						Log.d(TAG, "cursor 2");
+						if (logging == true) {
+							Log.d(TAG, "cursor 2");
+						}
 						port = successorMap.get(port);
 						if (!port.equals(originatorPort) && !port.equals(myPort) && myPort.equals(originatorPort)) {
 							cursor2 = actSynchronously("search", port, originatorPort, selectionArgss[0], null);
 						}
 					} catch (Exception e) {
-						Log.d(TAG, "cursor2 is null maybe");
-						Log.e(TAG, "query myPort.equals(portToStoreKey) " +
-								"second" +
-								" succ: " + port + " key: "+selectionArgss[0] + " originatorPort:"+originatorPort +" err: "+ e.toString());
+						if (logging == true) {
+							Log.d(TAG, "cursor2 is null " +
+									"maybe");
+						}
+						if (logging == true) {
+							Log.e(TAG, "query myPort.equals(portToStoreKey) " +
+									"second" +
+									" succ: " + port + " key: "+selectionArgss[0] + " originatorPort:"+originatorPort +" err: "+ e.toString());
+						}
+						Log.e(TAG, "998 " + e.toString());
 					}
 
 					try {
-						Log.d(TAG, "cursor 3");
+						if (logging == true) {
+							Log.d(TAG, "cursor 3");
+						}
 						port = successorMap.get(port);
 						if (!port.equals(originatorPort) && !port.equals(myPort) && myPort.equals(originatorPort)) {
 							cursor3 = actSynchronously("search", port, originatorPort, selectionArgss[0], null);
 						}
 					} catch (Exception e) {
-						Log.d(TAG, "cursor3 is null maybe");
-						Log.e(TAG, "query myPort.equals(portToStoreKey) " +
-								"third" +
-								" succ: " + port + " key: "+selectionArgss[0] + " originatorPort:"+originatorPort +" err: "+ e.toString());
+						if (logging == true) {
+							Log.d(TAG, "cursor3 is null " +
+									"maybe");
+						}
+						if (logging == true) {
+							Log.e(TAG, "query myPort.equals(portToStoreKey) " +
+									"third" +
+									" succ: " + port + " key: "+selectionArgss[0] + " originatorPort:"+originatorPort +" err: "+ e.toString());
+						}
+						Log.e(TAG, "912 " + e.toString());
 					}
 
 				try {
-					Log.d(TAG, "cursor 1");
+					if (logging == true) {
+						Log.d(TAG, "cursor 1");
+					}
 					if (!portToStoreKey.equals(originatorPort) && !portToStoreKey.equals(myPort) && myPort.equals(originatorPort)) {
 						cursor1 = actSynchronously("search", portToStoreKey, originatorPort, selectionArgss[0], null);
 					}
 				} catch (Exception e) {
-					Log.d(TAG, "cursor1 is null maybe");
-					Log.e(TAG, "query myPort.equals(portToStoreKey) first" +
-							" succ: " + port + " key: "+selectionArgss[0] + " originatorPort:"+originatorPort +" err: "+ e.toString());
+					if (logging == true) {
+						Log.d(TAG, "cursor1 is null maybe");
+					}
+					if (logging == true) {
+						Log.e(TAG, "query myPort.equals(portToStoreKey) first" +
+								" succ: " + port + " key: "+selectionArgss[0] + " originatorPort:"+originatorPort +" err: "+ e.toString());
+					}
+					Log.e(TAG, "924 " + e.toString());
 				}
 
 					String time = null;
@@ -912,7 +1048,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 					if (cursor != null && cursor.getCount() > 0) {
 						dummyCursor = cursor;
-						Log.d(TAG, "dumping time cursor: " + DatabaseUtils.dumpCursorToString(dummyCursor));
+						if (logging == true) {
+							Log.d(TAG, "dumping time cursor:" +
+									" " + DatabaseUtils.dumpCursorToString(dummyCursor));
+						}
 
 						cursor.moveToFirst();
 						time = cursor.getString(4);
@@ -927,87 +1066,144 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 					try {
 						if (cursor1 != null && cursor1.getCount() > 0) {
-							Log.d(TAG, "cursor1 != null && cursor1.getCount() > 0");
+							if (logging == true) {
+								Log.d(TAG, "cursor1 != null " +
+										"&& cursor1.getCount() > 0");
+							}
 							cursor1.moveToFirst();
 							time1 = cursor1.getString(4);
-							Log.d(TAG, "dumping cursor1: " + DatabaseUtils.dumpCursorToString(cursor1));
+							if (logging == true) {
+								Log.d(TAG, "dumping cursor1:" +
+										" " + DatabaseUtils.dumpCursorToString(cursor1));
+							}
 						}
 					} catch (Exception e) {
-						Log.e(TAG, "cursor1 is broken: "+e.toString());
+						if (logging == true) {
+							Log.e(TAG, "cursor1 is broken: "+e.toString());
+						}
+						Log.e(TAG, "958 " + e.toString());
 					}
 
 					try {
 						if (cursor2 != null && cursor2.getCount() > 0) {
-							Log.d(TAG, "cursor2 != null && cursor2.getCount() > 0");
+							if (logging == true) {
+								Log.d(TAG, "cursor2 != null " +
+										"&& cursor2.getCount() > 0");
+							}
 							cursor2.moveToFirst();
 							time2 = cursor2.getString(4);
-							Log.d(TAG, "dumping cursor2: " + DatabaseUtils.dumpCursorToString(cursor2));
+							if (logging == true) {
+								Log.d(TAG, "dumping cursor2:" +
+										" " + DatabaseUtils.dumpCursorToString(cursor2));
+							}
 						}
 					} catch (Exception e) {
-						Log.e(TAG, "cursor2 is broken: "+e.toString());
+						if (logging == true) {
+							Log.e(TAG, "cursor2 is broken: "+e.toString());
+						}
+						Log.e(TAG, "970 " + e.toString());
 					}
 
 					try {
 						if (cursor3 != null && cursor3.getCount() > 0) {
-							Log.d(TAG, "cursor3 != null && cursor3.getCount()" +
-									" > 0");
+							if (logging == true) {
+								Log.d(TAG, "cursor3 != null " +
+										"&& cursor3.getCount()" +
+										" > 0");
+							}
 							cursor3.moveToFirst();
 							time3 = cursor3.getString(4);
-							Log.d(TAG, "dumping cursor3: " + DatabaseUtils.dumpCursorToString(cursor3));
+							if (logging == true) {
+								Log.d(TAG, "dumping cursor3:" +
+										" " + DatabaseUtils.dumpCursorToString(cursor3));
+							}
 						}
 					} catch (Exception e) {
-						Log.e(TAG, "cursor3 is broken: "+e.toString());
+						if (logging == true) {
+							Log.e(TAG, "cursor3 is broken: "+e.toString());
+						}
+						Log.e(TAG, "983 " + e.toString());
 					}
 
 
 					if (time != null) {
-						Log.d(TAG, "time != null");
+						if (logging == true) {
+							Log.d(TAG, "time != null");
+						}
 						if (time1 != null && time1.compareTo(time) > 0) {
-							Log.d(TAG, "time1 != null && time1.compareTo(time) > 0");
+							if (logging == true) {
+								Log.d(TAG, "time1 != null &&" +
+										" time1.compareTo(time) > 0");
+							}
 							cursor = cursor1;
 							time = time1;
 						}
 
 						if (time2 != null && time2.compareTo(time) > 0) {
-							Log.d(TAG, "time2 != null && time2.compareTo(time) > 0");
+							if (logging == true) {
+								Log.d(TAG, "time2 != null &&" +
+										" time2.compareTo(time) > 0");
+							}
 							cursor = cursor2;
 							time = time2;
 						}
 
 						if (time3 != null && time3.compareTo(time) > 0) {
-							Log.d(TAG, "time3 != null && time3.compareTo" +
-									"(time) > 0");
+							if (logging == true) {
+								Log.d(TAG, "time3 != null &&" +
+										" time3.compareTo" +
+										"(time) > 0");
+							}
 							cursor = cursor3;
 							time = time3;
 						}
 					} else {
-						Log.d(TAG, "time == null");
+						if (logging == true) {
+							Log.d(TAG, "time == null");
+						}
 						if (time1 != null) {
-							Log.d(TAG, "time1 != null");
+							if (logging == true) {
+								Log.d(TAG, "time1 != null");
+							}
 							cursor = cursor1;
 
 							if (time2 != null && time2.compareTo(time1) > 0) {
-								Log.d(TAG, "time2 != null && time2.compareTo(time1) > 0");
+								if (logging == true) {
+									Log.d(TAG, "time2 != " +
+											"null && time2.compareTo(time1) > 0");
+								}
 								cursor = cursor2;
 								time1 = time2;
 							}
 
 							if (time3 != null && time3.compareTo(time1) > 0) {
-								Log.d(TAG, "time3 != null && time3.compareTo(time1) > 0");
+								if (logging == true) {
+									Log.d(TAG, "time3 != " +
+											"null && time3.compareTo(time1) > 0");
+								}
 								cursor = cursor3;
 							}
 						} else {
 							if (time2 != null) {
-								Log.d(TAG, "time2 != null");
+								if (logging == true) {
+									Log.d(TAG, "time2 != " +
+											"null");
+								}
 								cursor = cursor2;
 
 								if (time3 != null && time3.compareTo(time2) > 0) {
-									Log.d(TAG, "time3 != null && time3.compareTo(time2) > 0");
+									if (logging == true) {
+										Log.d(TAG, "time3 !=" +
+												" null && time3.compareTo(time2) > 0");
+									}
 									cursor = cursor3;
 								}
 							} else {
 								if (time3 != null) {
-									Log.d(TAG, "time3 != null");
+									if (logging == true) {
+										Log.d(TAG, "time3 !=" +
+												" null");
+									}
 									cursor = cursor3;
 								}
 							}
@@ -1038,13 +1234,13 @@ public class SimpleDynamoProvider extends ContentProvider {
 //						while ((cursor != null && cursor.getCount() <= 0) || cursor == null) {
 ////					while (cursor == null || cursor.getCount() <= 0) {
 //							try {
-//								Log.d(TAG, "query cursor myPort Not equals (portToStoreKey) ");
+//								if (logging == true)Log.d(TAG, "query cursor myPort Not equals (portToStoreKey) ");
 //								if (!port.equals(originatorPort)) {
 //									cursor = actSynchronously("search", port, originatorPort, selectionArgss[0]);
 //								}
 //
 //								dummyCursor = cursor;
-//								Log.d(TAG,
+//								if (logging == true)Log.d(TAG,
 //										"dumpcursor 817: "+DatabaseUtils.dumpCursorToString(dummyCursor));
 //
 //
@@ -1088,13 +1284,16 @@ public class SimpleDynamoProvider extends ContentProvider {
 //					}
 //				}
 			} catch (Exception e) {
-				Log.e(TAG, "querying else " + e.toString());
+				if (logging == true) {
+					Log.e(TAG, "querying else " + e.toString());
+				}
+				Log.e(TAG, "1116 " + e.toString());
 				e.printStackTrace();
 			}
 
 //			=================================
 //			if (myPort.equals(portToStoreKey)) {
-////				Log.d(TAG, "QUERYING myPort.equals(portToStoreKey) " + myPort + " " + selection);
+////				if (logging == true)Log.d(TAG, "QUERYING myPort.equals(portToStoreKey) " + myPort + " " + selection);
 //
 //				selection = COLUMN_NAME_KEY + "=?";
 //
@@ -1119,15 +1318,15 @@ public class SimpleDynamoProvider extends ContentProvider {
 //						"1"
 //				);
 //
-////				Log.d(TAG, "qKEY " + selectionArgss[0]);
+////				if (logging == true)Log.d(TAG, "qKEY " + selectionArgss[0]);
 //				try {
 //					if (cursor.getCount() > 0) {
-//						Log.d(TAG, "query cursor myPort.equals" +
+//						if (logging == true)Log.d(TAG, "query cursor myPort.equals" +
 //								"(portToStoreKey) ");
-//						Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+//						if (logging == true)Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
 ////						cursor.moveToFirst();
-////						Log.d(TAG,"cursor qKEY " + cursor.getString(0));
-////						Log.d(TAG,"cursor qVALUE "+ cursor.getString(1));
+////						if (logging == true)Log.d(TAG,"cursor qKEY " + cursor.getString(0));
+////						if (logging == true)Log.d(TAG,"cursor qVALUE "+ cursor.getString(1));
 //					}
 //				} catch (Exception e) {
 //					Log.e(TAG, e.toString());
@@ -1138,13 +1337,13 @@ public class SimpleDynamoProvider extends ContentProvider {
 //				// TODO
 //				//HERERERERERERERERRERERER CHECK IF KEY IS REPLICATED LOCALLY
 //				// OR JUST QUERY LOCAL, IF NOT FOUND THEN SEARCH THE RING
-//				Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
+//				if (logging == true)Log.d(TAG, "QUERYING myPort Not equals(portToStoreKey) " + myPort + " " + portToStoreKey + " " + selection);
 //				try {
 //					cursor = actSynchronously("search", portToStoreKey, originatorPort, selectionArgss[0]);
-//					Log.d(TAG, "query cursor myPort Not equals" +
+//					if (logging == true)Log.d(TAG, "query cursor myPort Not equals" +
 //							"(portToStoreKey) ");
 //					dummyCursor = cursor;
-//					Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
+//					if (logging == true)Log.d(TAG, DatabaseUtils.dumpCursorToString(dummyCursor));
 ////					cursor.moveToFirst();
 //				} catch (Exception e) {
 //					Log.e(TAG, "first call to actSynchronously: " + myPort);
@@ -1179,8 +1378,11 @@ public class SimpleDynamoProvider extends ContentProvider {
 								   String time) {
 		if (msgType.equals("search")) {
 			try {
-				Log.d(TAG, "actSynchronously Start for msgType:" + msgType +
-						" " + "portToConnect: " + portToConnect + " key: " + key + " originatorPort:" + originatorPort + " time: "+time);
+				if (logging == true) {
+					Log.d(TAG, "actSynchronously Start for " +
+							"msgType:" + msgType +
+							" " + "portToConnect: " + portToConnect + " key: " + key + " originatorPort:" + originatorPort + " time: "+time);
+				}
 				Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(portToConnect));
 				socket.setSoTimeout(500);
 
@@ -1249,9 +1451,12 @@ public class SimpleDynamoProvider extends ContentProvider {
 				in.close();
 				socket.close();
 			} catch (Exception e) {
-				Log.e(TAG,
-						"query Client search ExceptionFinal: " + e.toString() +
-								" actSynchronously Start for msgType:" + msgType + " " + "portToConnect: " + portToConnect + " key: " + key + " originatorPort:" + originatorPort);
+				if (logging == true) {
+					Log.e(TAG,
+							"query Client search ExceptionFinal: " + e.toString() +
+									" actSynchronously Start for msgType:" + msgType + " " + "portToConnect: " + portToConnect + " key: " + key + " originatorPort:" + originatorPort);
+				}
+				Log.e(TAG, "1280 " + e.toString());
 				e.printStackTrace();
 			}
 
@@ -1263,16 +1468,21 @@ public class SimpleDynamoProvider extends ContentProvider {
 			String _key = originatorPort;
 			String value = key;
 
-			Log.d(TAG,
-					msgType + " ClienTask for key: " + _key + " myPort: " + myPort + " sent to: " + nxtSuccessor +
-							" ASYNC MSG 1");
+			if (logging == true) {
+				Log.d(TAG,
+						msgType + " ClienTask for key: " + _key + " myPort: " + myPort + " sent to: " + nxtSuccessor +
+								" ASYNC MSG 1");
+			}
 			try {
 				Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
 				socket.setSoTimeout(500);
 
-				Log.d(TAG, msgType + " ClienTask for key: " + _key + " " +
-						"myPort: " + myPort + " sent to: " + nxtSuccessor +
-						" ASYNC MSG 2");
+				if (logging == true) {
+					Log.d(TAG, msgType + " ClienTask for " +
+							"key: " + _key + " " +
+							"myPort: " + myPort + " sent to: " + nxtSuccessor +
+							" ASYNC MSG 2");
+				}
 				messageStruct msgStruct;
 //				if (msgType.equals("replication")) {
 //					msgStruct = new messageStruct(
@@ -1301,11 +1511,14 @@ public class SimpleDynamoProvider extends ContentProvider {
 				in.close();
 
 				socket.close();
-//					Log.d(TAG, msgType + " ClienTask for key: " + _key + " "
+//					if (logging == true)Log.d(TAG, msgType + " ClienTask for key: " + _key + " "
 //					+ "myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG SENT");
 			} catch (EOFException e) {
-				Log.e(TAG, "ClientTask " + msgType + " " + nxtSuccessor + " " +
-						"SocketTimeoutException " + _key + " : " + e.toString());
+				if (logging == true) {
+					Log.e(TAG, "ClientTask " + msgType + " " + nxtSuccessor + " " +
+							"SocketTimeoutException " + _key + " : " + e.toString());
+				}
+				Log.e(TAG, "1335 " + e.toString());
 
 				String[] forClientPublishProgress = null;
 				if (msgType.equals("insert")) {
@@ -1342,8 +1555,11 @@ public class SimpleDynamoProvider extends ContentProvider {
 //						}
 				}
 			} catch (Exception e) {
-				Log.e(TAG,
-						"Client " + msgType + " ExceptionFinal: " + nxtSuccessor + " " + e.toString());
+				if (logging == true) {
+					Log.e(TAG,
+							"Client " + msgType + " ExceptionFinal: " + nxtSuccessor + " " + e.toString());
+				}
+				Log.e(TAG, "1374 " + e.toString());
 				e.printStackTrace();
 			}
 		}
@@ -1396,12 +1612,18 @@ public class SimpleDynamoProvider extends ContentProvider {
 				String key = msgs[2];
 				String value = msgs[3];
 
-				Log.d(TAG, msgType + " ClienTask for key: " + key + " myPort: " + myPort + " sent to: " + nxtSuccessor);
+				if (logging == true) {
+					Log.d(TAG, msgType + " ClienTask for " +
+							"key: " + key + " myPort: " + myPort + " sent to: " + nxtSuccessor);
+				}
 				try {
 					Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
 					socket.setSoTimeout(500);
 
-					Log.d(TAG, msgType + " ClienTask for key: " + key + " " + "myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG");
+					if (logging == true) {
+						Log.d(TAG, msgType + " ClienTask for" +
+								" key: " + key + " " + "myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG");
+					}
 					messageStruct msgStruct;
 					// TIME CAN CREATE PROBLEM HERE MAYBE
 					if (msgType.equals("replication")) {
@@ -1431,10 +1653,13 @@ public class SimpleDynamoProvider extends ContentProvider {
 					in.close();
 
 					socket.close();
-//					Log.d(TAG, msgType + " ClienTask for key: " + key + " " + "myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG SENT");
+//					if (logging == true)Log.d(TAG, msgType + " ClienTask for key: " + key + " " + "myPort: " + myPort + " sent to: " + nxtSuccessor + " DUPLICATE MSG SENT");
 				} catch (EOFException e) {
-					Log.e(TAG,
-							"ClientTask ASYNC " + msgType + " " + nxtSuccessor + " SocketTimeoutException " + key + " : " + e.toString());
+					if (logging == true) {
+						Log.e(TAG,
+								"ClientTask ASYNC " + msgType + " " + nxtSuccessor + " SocketTimeoutException " + key + " : " + e.toString());
+					}
+					Log.e(TAG, "1662 " + e.toString());
 
 					String[] forClientPublishProgress = null;
 					if (msgType.equals("insert")) {
@@ -1443,7 +1668,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //						for (int i=0; i<2; i++) {
 //							port = successorMap.get(port);
 //
-//							Log.d(TAG, "insert failed for Async client: " + nxtSuccessor + " key: " + key + " value: "+value);
+//							if (logging == true)Log.d(TAG, "insert failed for Async client: " + nxtSuccessor + " key: " + key + " value: "+value);
 //							forClientPublishProgress = new String[]{
 //								"replication",
 //								port,
@@ -1472,8 +1697,11 @@ public class SimpleDynamoProvider extends ContentProvider {
 //						}
 					}
 				} catch (Exception e) {
-					Log.e(TAG,
-							"Client " + msgType + " ExceptionFinal: " + nxtSuccessor + " " + e.toString());
+					if (logging == true) {
+						Log.e(TAG,
+								"Client " + msgType + " ExceptionFinal: " + nxtSuccessor + " " + e.toString());
+					}
+					Log.e(TAG, "1506 " + e.toString());
 					e.printStackTrace();
 				}
 			} else if (msgType.equals("delete")) {
@@ -1496,13 +1724,16 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 					socket.close();
 				} catch (Exception e) {
-					Log.e(TAG, "Client delete ExceptionFinal: " + e.toString());
+					if (logging == true) {
+						Log.e(TAG, "Client delete ExceptionFinal: " + e.toString());
+					}
+					Log.e(TAG, "1530 " + e.toString());
 					e.printStackTrace();
 				}
 			} else if (msgType.equals("replicate") || msgType.equals("getMissedInsert")) {
 				String originatorPort = msgs[2];
 
-//				Log.d(TAG, "Insert ClienTask for key: " + key + " myPort: " + myPort + " sent to: " + nxtSuccessor);
+//				if (logging == true)Log.d(TAG, "Insert ClienTask for key: " + key + " myPort: " + myPort + " sent to: " + nxtSuccessor);
 				try {
 					Socket socket = new Socket(InetAddress.getByAddress(new byte[]{10, 0, 2, 2}), Integer.parseInt(nxtSuccessor));
 
@@ -1524,8 +1755,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 					if (cursorKeyValueMap != null && !cursorKeyValueMap.isEmpty()) {
 						for (Map.Entry<String, String> entry : cursorKeyValueMap.entrySet()) {
-							Log.d(TAG,
-									"looping "+msgType+" for failed nodes " + entry.getKey() + " myPort: " + myPort + " from node: " + nxtSuccessor);
+							if (logging == true) {
+								Log.d(TAG,
+										"looping "+msgType+" for failed nodes " + entry.getKey() + " myPort: " + myPort + " from node: " + nxtSuccessor);
+							}
 //							ContentValues values = new ContentValues();
 
 //							values.put(SimpleDynamoProvider.COLUMN_NAME_KEY, entry.getKey());
@@ -1546,8 +1779,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 							v = entry.getValue();
 
 							String[] value_time = v.split("-");
-							Log.d(TAG,
-									msgType+" printing | k: "+k+" v: "+value_time[0] + " t: "+value_time[1] + " oV:"+v);
+							if (logging == true) {
+								Log.d(TAG,
+										msgType+" printing | k: "+k+" v: "+value_time[0] + " t: "+value_time[1] + " oV:"+v);
+							}
 
 							insertReplication(CONTENT_URI, k,
 									value_time[0], values_type,
@@ -1559,7 +1794,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 
 					socket.close();
 				} catch (Exception e) {
-					Log.e(TAG, "Client " + msgType + " ExceptionFinal: " + e.toString());
+					if (logging == true) {
+						Log.e(TAG, "Client " + msgType + " ExceptionFinal: " + e.toString());
+					}
+					Log.e(TAG, "1594 " + e.toString());
 					e.printStackTrace();
 				}
 			}
@@ -1594,7 +1832,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 			messageStruct msgPlusPortObject = new messageStruct();
 
 			while(true){
-//				Log.d(TAG, "GLOBAL myPort: " + myPort + "," + " succ: "+ successor + ", pred: "+predecessor);
+//				if (logging == true)Log.d(TAG, "GLOBAL myPort: " + myPort + "," + " succ: "+ successor + ", pred: "+predecessor);
 				try {
 					Socket clientSocket = null;
 					clientSocket = serverSocket.accept();
@@ -1611,7 +1849,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 //						values.put(SimpleDynamoProvider.COLUMN_NAME_VALUE, msgPlusPortObject.value);
 
 						if (msgPlusPortObject.msg.equals("replication")) {
-							Log.d(TAG, "insertReplication ServerTask for key:" + " " + msgPlusPortObject.key + " myPort: " + myPort);
+							if (logging == true) {
+								Log.d(TAG,
+										"insertReplication ServerTask for key:" + " " + msgPlusPortObject.key + " myPort: " + myPort);
+							}
 
 							String values_type = "replication";
 							String values_port = msgPlusPortObject.originatorPort;
@@ -1621,7 +1862,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 									values_port, msgPlusPortObject.msg,
 									msgPlusPortObject.time);
 						} else {
-							Log.d(TAG, "Insert ServerTask for key: " + msgPlusPortObject.key + " myPort: " + myPort);
+							if (logging == true) {
+								Log.d(TAG, "Insert " +
+										"ServerTask for key: " + msgPlusPortObject.key + " myPort: " + myPort);
+							}
 							ContentValues values = new ContentValues();
 
 							values.put(SimpleDynamoProvider.COLUMN_NAME_KEY, msgPlusPortObject.key);
@@ -1629,7 +1873,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 							values.put("type", "insertion");
 							values.put("port", myPort);
 							insert(CONTENT_URI, values);
-//							Log.d(TAG, "Insert DONE ServerTask for key: " + msgPlusPortObject.key + " myPort: " + myPort);
+//							if (logging == true)Log.d(TAG, "Insert DONE ServerTask for key: " + msgPlusPortObject.key + " myPort: " + myPort);
 						}
 						ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
 						out.writeObject(msgPlusPortObject);
@@ -1643,7 +1887,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 							try {
 								hashKey = genHash(msgPlusPortObject.key);
 							} catch (NoSuchAlgorithmException e) {
-								Log.e(TAG, "CP query " + e.toString());
+								if (logging == true) {
+									Log.e(TAG, "CP query " + e.toString());
+								}
+								Log.e(TAG, "1679 " + e.toString());
 							}
 //							if (predecessor == null || (myPortHash.compareTo(hashKey) >= 0 && hashKey.compareTo(predecessorHash) > 0)) {
 //								cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
@@ -1651,7 +1898,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 //								if (hashKey.compareTo(myPortHash) <= 0 && hashKey.compareTo(successorHash) < 0) {
 //									cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
 //								} else if (hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) < 0) {
-//									Log.d(TAG, "hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) < 0");
+//									if (logging == true)Log.d(TAG, "hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) < 0");
 //									cursor = actSynchronously("search", successor, msgPlusPortObject.originatorPort, msgPlusPortObject.key);
 //								} else if (hashKey.compareTo(myPortHash) > 0 && hashKey.compareTo(successorHash) > 0) {
 //									cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
@@ -1663,7 +1910,10 @@ public class SimpleDynamoProvider extends ContentProvider {
 //							} else if (myPortHash.compareTo(hashKey) > 0 && predecessorHash.compareTo(hashKey) > 0 && successorHash.compareTo(hashKey) > 0 && myPortHash.compareTo(predecessorHash) < 0) {
 //								cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
 //							} else {
-								Log.d(TAG, "else in server search");
+								if (logging == true) {
+									Log.d(TAG, "else in " +
+											"server search");
+								}
 								cursor = query(CONTENT_URI, null, msgPlusPortObject.key, new String[]{msgPlusPortObject.originatorPort}, null);
 //								cursor = actSynchronously("search", successor, msgPlusPortObject.originatorPort, msgPlusPortObject.key);
 //							}
@@ -1694,7 +1944,7 @@ public class SimpleDynamoProvider extends ContentProvider {
 						out.flush();
 						out.close();
 					} else if (msgPlusPortObject.msg.equals("replicate") || msgPlusPortObject.msg.equals("getMissedInsert")) {
-//						Log.d(TAG, "replicate 1");
+//						if (logging == true)Log.d(TAG, "replicate 1");
 						Cursor cursor = null;
 						if (msgPlusPortObject.msg.equals("replicate")) {
 							cursor = query(CONTENT_URI, null, "insertion", new String[]{msgPlusPortObject.originatorPort}, null);
@@ -1702,9 +1952,9 @@ public class SimpleDynamoProvider extends ContentProvider {
 							cursor = query(CONTENT_URI, null, "replication",new String[]{msgPlusPortObject.originatorPort}, null);
 						}
 
-//						Log.d(TAG, "replicate 2");
+//						if (logging == true)Log.d(TAG, "replicate 2");
 						if (cursor.getCount() > 0) {
-//							Log.d(TAG, "replicate 3");
+//							if (logging == true)Log.d(TAG, "replicate 3");
 							cursor.moveToFirst();
 
 
@@ -1713,28 +1963,39 @@ public class SimpleDynamoProvider extends ContentProvider {
 							while(!cursor.isAfterLast()) {
 								k = cursor.getString(0);
 								v = cursor.getString(1)+"-"+cursor.getString(4);
-								Log.d(TAG, msgPlusPortObject.msg + " printing | " + "k: "+k+" v: "+v);
+								if (logging == true) {
+									Log.d(TAG,
+											msgPlusPortObject.msg + " printing | " + "k: "+k+" v: "+v);
+								}
 								cursorKeyValueMap.put(k, v);
 								cursor.moveToNext();
 							}
 							msgPlusPortObject.keyValueMap = cursorKeyValueMap;
 						}
 
-//						Log.d(TAG, "replicate 4");
+//						if (logging == true)Log.d(TAG, "replicate 4");
 						ObjectOutputStream out = new ObjectOutputStream(clientSocket.getOutputStream());
 						out.writeObject(msgPlusPortObject);
 						out.flush();
 						out.close();
 					} else if (msgPlusPortObject.msg.equals("delete")) {
-						Log.d(TAG, "ServerTask delete for key: " + msgPlusPortObject.key + " myPort: "+myPort);
+						if (logging == true) {
+							Log.d(TAG, "ServerTask delete " +
+									"for key: " + msgPlusPortObject.key + " myPort: "+myPort);
+						}
 						delete(CONTENT_URI, msgPlusPortObject.key, null);
-						Log.d(TAG,
-								"ServerTask delete DONE for key: " + msgPlusPortObject.key + " myPort: "+myPort);
+						if (logging == true) {
+							Log.d(TAG,
+									"ServerTask delete DONE for key: " + msgPlusPortObject.key + " myPort: "+myPort);
+						}
 					}
 
 					clientSocket.close();
 				} catch (Exception e){
-					Log.e(TAG, "Server search Error: " + e.toString());
+					if (logging == true) {
+						Log.e(TAG, "Server search Error: " + e.toString());
+					}
+					Log.e(TAG, "1771 " + e.toString());
 					e.printStackTrace();
 				}
 			}
